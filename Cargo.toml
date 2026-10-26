@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["crates/encore-app", "crates/encore-core", "crates/encore-ui"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[workspace.dependencies]
+gpui-kit = "0.7.3"
+anyhow = "1"
+thiserror = "2"
+tempfile = "3"
+rusqlite = { version = "0.40", features = ["bundled"] }
+encore-core = { path = "crates/encore-core" }
+encore-ui = { path = "crates/encore-ui" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

@@ -1,5 +1,4 @@
 use anyhow::Context;
-use encore_ui::Root;
 use gpui_kit::{component::TitleBar, *};
 
 fn main() {
@@ -14,8 +13,8 @@ fn main() {
 }
 
 fn start(cx: &mut App) -> anyhow::Result<()> {
-	init(cx);
- let options = WindowOptions {
+    init(cx);
+    let options = WindowOptions {
         #[cfg(target_os = "linux")]
         window_background: WindowBackgroundAppearance::Transparent,
         #[cfg(target_os = "linux")]
@@ -23,8 +22,8 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
         ..TitleBar::window_options()
     };
 
-    open_window(options, cx, |_, cx| {
-    	cx.new(|_| Root)
+    open_window(options, cx, |window, cx| {
+        cx.new(|cx| encore_ui::DesktopRoot::new(window, cx))
     })
     .context("failed to open window")?;
     Ok(())

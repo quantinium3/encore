@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/encore-app", "crates/encore-core", "crates/encore-ui"]
+members = ["crates/encore-app", "crates/encore-auth", "crates/encore-core", "crates/encore-ui"]
 
 [workspace.package]
 version = "0.1.0"

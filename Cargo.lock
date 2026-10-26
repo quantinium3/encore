@@ -1464,6 +1464,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "encore-auth"
+version = "0.1.0"
+
+[[package]]
 name = "encore-core"
 version = "0.1.0"
 dependencies = [

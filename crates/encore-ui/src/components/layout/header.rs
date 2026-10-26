@@ -27,10 +27,16 @@ impl Header {
 impl RenderOnce for Header {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
         TitleBar::new().child(
-            SidebarToggleButton::new()
-                .collapsed(self.sidebar_collapsed)
-                .accessibility_label("Toggle Sidebar")
-                .on_click(self.on_toggle_sidebar),
+            div()
+                .id("sidebar-toggle")
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(|_, _, cx| cx.stop_propagation())
+                .child(
+                    SidebarToggleButton::new()
+                        .collapsed(self.sidebar_collapsed)
+                        .accessibility_label("Toggle Sidebar")
+                        .on_click(self.on_toggle_sidebar),
+                ),
         )
     }
 }

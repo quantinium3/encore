@@ -1735,8 +1735,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "encore_core",
  "tao",
  "tempfile",
+ "thiserror 2.0.21",
+ "url",
  "wry",
 ]
 

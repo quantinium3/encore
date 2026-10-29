@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS settings (
+	category TEXT NOT NULL,
+	key TEXT NOT NULL,
+	value TEXT NOT NULL,
+	PRIMARY KEY (category, key)
+) WITHOUT ROWID;

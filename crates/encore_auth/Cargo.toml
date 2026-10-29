@@ -4,15 +4,23 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = ["webview"]
+webview = ["dep:anyhow", "dep:clap", "dep:tao", "dep:url", "dep:wry"]
+
 [[bin]]
 name = "encore-login"
 path = "src/main.rs"
+required-features = ["webview"]
 
 [dependencies]
-anyhow.workspace = true
-clap = { version = "4.6.7", features = ["derive"] }
-tao = "0.37.1"
-wry = "0.57.0"
+anyhow = { workspace = true, optional = true }
+clap = { version = "4.6.7", features = ["derive"], optional = true }
+encore_core.workspace = true
+tao = { version = "0.37.1", optional = true }
+thiserror.workspace = true
+url = { version = "2", optional = true }
+wry = { version = "0.57.0", optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true

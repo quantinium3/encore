@@ -1,7 +1,8 @@
 [package]
-name = "encore-auth"
+name = "encore_core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+thiserror.workspace = true

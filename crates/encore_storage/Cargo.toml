@@ -1,0 +1,12 @@
+[package]
+name = "encore_storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+encore_core.workspace = true
+rusqlite_migration = { workspace = true, features = ["from-directory"] }
+include_dir = "0.7.4"
+thiserror.workspace = true

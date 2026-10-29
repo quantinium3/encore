@@ -1,9 +1,7 @@
 use crate::components::layout::{header::Header, sidebar::AppSidebar};
 use gpui_kit::{
-    AppContext as _, Context, IntoElement, ParentElement as _, Render, Styled as _, Window,
-    WindowOptions,
+    Context, IntoElement, ParentElement as _, Render, Styled as _, Window,
     base::{h_flex, v_flex},
-    div,
 };
 
 pub struct DesktopRoot {

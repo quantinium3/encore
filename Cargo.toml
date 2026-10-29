@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crates/encore-app", "crates/encore-auth", "crates/encore-core", "crates/encore-ui"]
+members = [
+	"crates/encore_app",
+	"crates/encore_auth",
+	"crates/encore_core", "crates/encore_storage",
+	"crates/encore_ui",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,9 +17,13 @@ gpui-kit = "0.7.3"
 anyhow = "1"
 thiserror = "2"
 tempfile = "3"
+futures = "0.3.34"
 rusqlite = { version = "0.40", features = ["bundled"] }
-encore-core = { path = "crates/encore-core" }
-encore-ui = { path = "crates/encore-ui" }
+rusqlite_migration = "2"
+encore_core = { path = "crates/encore_core" }
+encore_ui = { path = "crates/encore_ui" }
+encore_auth = { path = "crates/encore_auth" }
+encore_storage = { path = "crates/encore_storage" }
 
 [profile.dev]
 opt-level = 1

@@ -1,5 +1,5 @@
 [package]
-name = "encore-app"
+name = "encore_app"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,6 +7,8 @@ license.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 anyhow.workspace = true
-encore-core.workspace = true
-encore-ui.workspace = true
+encore_core.workspace = true
+encore_ui.workspace = true
+encore_auth.workspace = true
+encore_storage.workspace = true
 dirs = "7.0.0"

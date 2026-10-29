@@ -1,8 +1,0 @@
-[package]
-name = "encore-core"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-
-[dependencies]
-reqwest = { version = "0.13.5", features = ["json"] }

@@ -4,6 +4,7 @@ members = [
 	"crates/encore_app",
 	"crates/encore_auth",
 	"crates/encore_core", "crates/encore_storage",
+	"crates/encore_innertube",
 	"crates/encore_ui",
 ]
 
@@ -23,6 +24,7 @@ rusqlite_migration = "2"
 encore_core = { path = "crates/encore_core" }
 encore_ui = { path = "crates/encore_ui" }
 encore_auth = { path = "crates/encore_auth" }
+encore_innertube = { path = "crates/encore_innertube" }
 encore_storage = { path = "crates/encore_storage" }
 
 [profile.dev]

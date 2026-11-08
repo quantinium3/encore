@@ -1,4 +1,4 @@
-pub const LOGIN_BINARY: &str = "encore-login";
+pub const LOGIN_BINARY: &str = "encore_login";
 
 pub const FLAG_DATA_DIR: &str = "--data-dir";
 

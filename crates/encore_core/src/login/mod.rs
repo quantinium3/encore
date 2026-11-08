@@ -12,4 +12,4 @@ pub use profile::ProfileStore;
 pub use provider::{Login, LoginProvider};
 pub use refresher::{RefreshError, SessionRefresher};
 pub use session::{Session, sapisid};
-pub use validator::{SessionValidator, ValidationError};
+pub use validator::{SessionValidator, ValidationError, VerifiedSession};

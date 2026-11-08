@@ -1,4 +1,6 @@
-use encore_core::{Account, AccountId, AccountStore, SettingKey, SettingsStore, StorageError};
+use encore_core::{
+    Account, AccountId, AccountProfile, AccountStore, SettingKey, SettingsStore, StorageError,
+};
 use rusqlite::{OptionalExtension, Row, params};
 
 use crate::{SqliteStore, error::SqliteError};
@@ -10,6 +12,11 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<Account> {
         id: AccountId::new(row.get::<_, String>(0)?),
         session_cookie: row.get(1)?,
         added_at_unix: row.get(2)?,
+        profile: AccountProfile {
+            name: row.get(3)?,
+            detail: row.get(4)?,
+            avatar_url: row.get(5)?,
+        },
     })
 }
 
@@ -17,12 +24,20 @@ impl AccountStore for SqliteStore {
     fn save(&self, account: &Account) -> Result<(), StorageError> {
         let conn = self.conn()?;
         conn.execute(
-            "INSERT INTO accounts (id, session_cookie, added_at_unix) VALUES (?1, ?2, ?3)
-             ON CONFLICT(id) DO UPDATE SET session_cookie = excluded.session_cookie",
+            "INSERT INTO accounts (id, session_cookie, added_at_unix, name, detail, avatar_url)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(id) DO UPDATE SET
+                 session_cookie = excluded.session_cookie,
+                 name = excluded.name,
+                 detail = excluded.detail,
+                 avatar_url = excluded.avatar_url",
             params![
                 account.id.as_str(),
                 account.session_cookie,
-                account.added_at_unix
+                account.added_at_unix,
+                account.profile.name,
+                account.profile.detail,
+                account.profile.avatar_url,
             ],
         )
         .map_err(SqliteError::Query)?;
@@ -32,7 +47,7 @@ impl AccountStore for SqliteStore {
         let conn = self.conn()?;
         let mut stmt = conn
             .prepare(
-                "SELECT id, session_cookie, added_at_unix FROM accounts ORDER BY added_at_unix",
+                "SELECT id, session_cookie, added_at_unix, name, detail, avatar_url FROM accounts ORDER BY added_at_unix",
             )
             .map_err(SqliteError::Query)?;
         let accounts = stmt
@@ -47,7 +62,7 @@ impl AccountStore for SqliteStore {
         let conn = self.conn()?;
         let account = conn
             .query_row(
-                "SELECT id, session_cookie, added_at_unix FROM accounts WHERE id = ?1",
+                "SELECT id, session_cookie, added_at_unix, name, detail, avatar_url FROM accounts WHERE id = ?1",
                 params![id.as_str()],
                 from_row,
             )
@@ -118,7 +133,17 @@ mod tests {
             id: AccountId::new(id),
             session_cookie: cookie.into(),
             added_at_unix,
+            profile: AccountProfile::default(),
         }
+    }
+
+    fn with_profile(mut account: Account, name: &str, detail: &str, avatar: &str) -> Account {
+        account.profile = AccountProfile {
+            name: name.into(),
+            detail: Some(detail.into()),
+            avatar_url: Some(avatar.into()),
+        };
+        account
     }
 
     #[test]
@@ -246,5 +271,78 @@ mod tests {
         store.delete(&bob.id).unwrap();
 
         assert_eq!(store.active().unwrap(), Some(alice.id));
+    }
+
+    #[test]
+    fn the_profile_is_saved_and_read_back() {
+        let store = SqliteStore::open_in_memory().unwrap();
+        let alice = with_profile(
+            account("alice", "cookie", 10),
+            "Alice",
+            "@alice",
+            "https://img.example/alice.jpg",
+        );
+
+        store.save(&alice).unwrap();
+
+        assert_eq!(store.get(&alice.id).unwrap(), Some(alice.clone()));
+        assert_eq!(store.list().unwrap(), [alice]);
+    }
+
+    #[test]
+    fn an_account_without_profile_details_reads_back_with_none() {
+        let store = SqliteStore::open_in_memory().unwrap();
+        let bare = account("bare", "cookie", 10);
+
+        store.save(&bare).unwrap();
+
+        let saved = store.get(&bare.id).unwrap().unwrap();
+        assert_eq!(saved.profile, AccountProfile::default());
+    }
+
+    #[test]
+    fn saving_again_updates_the_profile_and_keeps_the_added_time() {
+        let store = SqliteStore::open_in_memory().unwrap();
+        store
+            .save(&with_profile(
+                account("alice", "old", 10),
+                "Old",
+                "@old",
+                "old.jpg",
+            ))
+            .unwrap();
+
+        store
+            .save(&with_profile(
+                account("alice", "new", 99),
+                "New",
+                "@new",
+                "new.jpg",
+            ))
+            .unwrap();
+
+        assert_eq!(
+            store.get(&AccountId::new("alice")).unwrap(),
+            Some(with_profile(
+                account("alice", "new", 10),
+                "New",
+                "@new",
+                "new.jpg"
+            ))
+        );
+    }
+
+    #[test]
+    fn a_profile_detail_can_be_cleared_by_saving_none() {
+        let store = SqliteStore::open_in_memory().unwrap();
+        store
+            .save(&with_profile(account("alice", "c", 10), "A", "@a", "a.jpg"))
+            .unwrap();
+
+        store.save(&account("alice", "c", 10)).unwrap();
+
+        let saved = store.get(&AccountId::new("alice")).unwrap().unwrap();
+        assert_eq!(saved.profile.detail, None);
+        assert_eq!(saved.profile.avatar_url, None);
     }
 }

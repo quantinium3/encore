@@ -1,3 +1,0 @@
-ALTER TABLE accounts ADD COLUMN name TEXT NOT NULL DEFAULT '';
-ALTER TABLE accounts ADD COLUMN detail TEXT;
-ALTER TABLE accounts ADD COLUMN avatar_url TEXT;

@@ -237,7 +237,7 @@ mod tests {
     fn a_missing_helper_is_a_backend_error() {
         let (_root, profiles) = profiles();
 
-        let result = LoginProvider::new("/nonexistent/encore-login", profiles).login();
+        let result = LoginProvider::new("/nonexistent/encore_login", profiles).login();
 
         assert!(matches!(result, Err(LoginError::Backend(_))));
     }
@@ -322,7 +322,7 @@ mod tests {
     fn refresh_with_a_missing_helper_is_a_backend_error() {
         let (_root, profiles) = profiles();
         fs::create_dir_all(profiles.path(&alice())).unwrap();
-        let refresher = SessionRefresher::new("/nonexistent/encore-login", profiles);
+        let refresher = SessionRefresher::new("/nonexistent/encore_login", profiles);
 
         let result = refresher.refresh(&alice(), &Session::new("c"));
 

@@ -75,7 +75,7 @@ impl Room {
             agent: request_agent,
         };
         std::thread::Builder::new()
-            .name("encore-room-send".into())
+            .name("encore_room_send".into())
             .spawn(move || {
                 while let Ok(intent) = queued.recv() {
                     sender.deliver(intent);
@@ -131,7 +131,7 @@ struct Poller {
 
 fn spawn_poller(poller: Poller) -> anyhow::Result<()> {
     std::thread::Builder::new()
-        .name("encore-room-poll".into())
+        .name("encore_room_poll".into())
         .spawn(move || poller.run())
         .map(|_| ())
         .context("could not start the room listener")

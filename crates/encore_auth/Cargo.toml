@@ -9,7 +9,7 @@ default = ["webview"]
 webview = ["dep:anyhow", "dep:clap", "dep:tao", "dep:url", "dep:wry"]
 
 [[bin]]
-name = "encore-login"
+name = "encore_login"
 path = "src/main.rs"
 required-features = ["webview"]
 

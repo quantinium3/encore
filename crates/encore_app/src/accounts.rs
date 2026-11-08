@@ -27,7 +27,7 @@ type Service = AccountService<
     SessionKeeper,
 >;
 
-pub(crate) const DATABASE_FILE: &str = "encore-app.sqlite";
+pub(crate) const DATABASE_FILE: &str = "encore_app.sqlite";
 const UNNAMED_ACCOUNT: &str = "YouTube Music account";
 const MAX_MESSAGE_CHARS: usize = 200;
 const WORKER_STOPPED: &str = "The background task stopped unexpectedly.";

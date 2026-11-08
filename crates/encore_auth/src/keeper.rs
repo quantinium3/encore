@@ -539,7 +539,7 @@ mod tests {
     #[test]
     fn a_missing_helper_does_not_panic_and_stops_cleanly() {
         let f = fixture(
-            Path::new("/nonexistent/encore-login"),
+            Path::new("/nonexistent/encore_login"),
             Duration::from_millis(20),
             &[alice()],
         );

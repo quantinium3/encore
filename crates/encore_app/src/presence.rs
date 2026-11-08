@@ -31,7 +31,7 @@ impl Presence {
             .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_owned());
         let (sender, receiver) = channel();
         let spawned = std::thread::Builder::new()
-            .name("encore-discord-presence".into())
+            .name("encore_discord_presence".into())
             .spawn(move || run(client_id, receiver));
         match spawned {
             Ok(_) => Self {

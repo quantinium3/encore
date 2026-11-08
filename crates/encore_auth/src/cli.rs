@@ -10,7 +10,7 @@ const MUSIC_URL: &str = "https://music.youtube.com/";
 
 #[derive(Parser)]
 #[command(
-    name = "encore-login",
+    name = "encore_login",
     version,
     about = "Signs in to YouTube Music for Encore"
 )]
@@ -116,7 +116,7 @@ mod tests {
     use super::*;
 
     fn parse(args: &[&str]) -> Result<Command, clap::Error> {
-        Cli::try_parse_from(std::iter::once("encore-login").chain(args.iter().copied()))
+        Cli::try_parse_from(std::iter::once("encore_login").chain(args.iter().copied()))
             .map(|cli| cli.command)
     }
 

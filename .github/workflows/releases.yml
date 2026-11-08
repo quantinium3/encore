@@ -1,0 +1,10 @@
+name: Encore
+on: [push]
+jobs:
+  Explore-Github-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - run: actions/checkout@v6
+      - run: cargo build --release --workspaces --bins
+      - run: cargo test --workspace
+      - run: cargo package

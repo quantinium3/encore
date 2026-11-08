@@ -1,8 +1,7 @@
 name: Encore
 on:
   push:
-    tags:
-      - "v*"
+
 jobs:
   Explore-Github-Actions:
     runs-on: ubuntu-latest

@@ -2,6 +2,7 @@ mod account;
 mod error;
 mod library;
 mod login;
+mod playback;
 mod settings;
 
 pub use account::{
@@ -17,4 +18,5 @@ pub use login::{
     Login, LoginError, LoginProvider, ProfileStore, RefreshError, Session, SessionEvent,
     SessionKeeper, SessionRefresher, SessionValidator, ValidationError, VerifiedSession, sapisid,
 };
+pub use playback::{PlaybackQueue, RepeatMode};
 pub use settings::{SettingKey, SettingsStore};

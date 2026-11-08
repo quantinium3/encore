@@ -1,12 +1,12 @@
 use std::cmp::Ordering;
 
 use gpui_kit::{
-    AnyElement, ClipboardItem, Context, Entity, Hsla, IntoElement, ParentElement as _,
-    Render, SharedString, Styled as _, Subscription, Window,
+    AnyElement, App, ClickEvent, ClipboardItem, Context, Entity, Hsla, IntoElement,
+    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window,
     assets::IconName,
     base::{h_flex, v_flex},
     component::{
-        ActiveTheme as _, Icon, Sizable as _, WindowExt as _,
+        ActiveTheme as _, Disableable as _, Icon, Sizable as _, WindowExt as _,
         button::{Button, ButtonVariants as _},
         input::{Input, InputEvent, InputState},
         menu::{DropdownMenu as _, PopupMenu, PopupMenuItem},
@@ -14,9 +14,11 @@ use gpui_kit::{
     },
     div, px,
 };
+use rand::seq::SliceRandom as _;
 
 use crate::components::playlist::header::PlaylistHeader;
 use crate::components::playlist::track_item::PlaylistTrackItem;
+use crate::player::PlayerModel;
 use crate::playlist_detail::{
     PlaylistDetailModel, PlaylistDetailSummary, PlaylistPrivacy, TrackSummary,
 };
@@ -54,20 +56,24 @@ impl SortField {
 
 pub struct PlaylistDetailView {
     model: Entity<PlaylistDetailModel>,
+    player: Entity<PlayerModel>,
     search_input: Entity<InputState>,
     sort: SortField,
     sort_descending: bool,
     _observe_detail: Subscription,
+    _observe_player: Subscription,
     _observe_search: Subscription,
 }
 
 impl PlaylistDetailView {
     pub fn new(
         model: Entity<PlaylistDetailModel>,
+        player: Entity<PlayerModel>,
         search_input: Entity<InputState>,
         cx: &mut Context<Self>,
     ) -> Self {
         let observe_detail = cx.observe(&model, |_, _, cx| cx.notify());
+        let observe_player = cx.observe(&player, |_, _, cx| cx.notify());
         let observe_search = cx.subscribe(&search_input, |_, _, event: &InputEvent, cx| {
             if let InputEvent::Change = event {
                 cx.notify();
@@ -75,10 +81,12 @@ impl PlaylistDetailView {
         });
         Self {
             model,
+            player,
             search_input,
             sort: SortField::Position,
             sort_descending: false,
             _observe_detail: observe_detail,
+            _observe_player: observe_player,
             _observe_search: observe_search,
         }
     }
@@ -88,8 +96,17 @@ impl Render for PlaylistDetailView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
         let detail = self.model.read(cx).detail().cloned();
+        let player_state = self.player.read(cx);
+        let now_playing = player_state.current_track().map(|track| track.id.clone());
+        let status = player_state.status();
         let query = self.search_input.read(cx).value().to_lowercase();
 
+        let playback = Playback {
+            now_playing: now_playing.as_ref(),
+            now_loading: status.is_loading(),
+            now_playing_actively: status.is_playing(),
+            player: &self.player,
+        };
         let toolbar = Toolbar {
             search_input: &self.search_input,
             query: &query,
@@ -97,10 +114,11 @@ impl Render for PlaylistDetailView {
             sort_descending: self.sort_descending,
             view: cx.entity(),
             muted,
+            primary_foreground: cx.theme().primary_foreground,
         };
 
         match detail {
-            Some(detail) => render_detail(detail, toolbar).into_any_element(),
+            Some(detail) => render_detail(detail, playback, toolbar).into_any_element(),
             None => div()
                 .w_full()
                 .min_w_0()
@@ -113,6 +131,13 @@ impl Render for PlaylistDetailView {
     }
 }
 
+struct Playback<'a> {
+    now_playing: Option<&'a SharedString>,
+    now_loading: bool,
+    now_playing_actively: bool,
+    player: &'a Entity<PlayerModel>,
+}
+
 struct Toolbar<'a> {
     search_input: &'a Entity<InputState>,
     query: &'a str,
@@ -120,9 +145,20 @@ struct Toolbar<'a> {
     sort_descending: bool,
     view: Entity<PlaylistDetailView>,
     muted: Hsla,
+    primary_foreground: Hsla,
 }
 
-fn render_detail(detail: PlaylistDetailSummary, toolbar: Toolbar) -> AnyElement {
+fn render_detail(
+    detail: PlaylistDetailSummary,
+    playback: Playback,
+    toolbar: Toolbar,
+) -> AnyElement {
+    let Playback {
+        now_playing,
+        now_loading,
+        now_playing_actively,
+        player,
+    } = playback;
     let Toolbar {
         search_input,
         query,
@@ -130,6 +166,7 @@ fn render_detail(detail: PlaylistDetailSummary, toolbar: Toolbar) -> AnyElement 
         sort_descending,
         view,
         muted,
+        primary_foreground,
     } = toolbar;
 
     let mut header = PlaylistHeader::new(detail.title);
@@ -148,6 +185,8 @@ fn render_detail(detail: PlaylistDetailSummary, toolbar: Toolbar) -> AnyElement 
         header = header.meta(meta);
     }
 
+    let all_tracks = detail.tracks.clone();
+
     let mut tracks: Vec<TrackSummary> = detail
         .tracks
         .into_iter()
@@ -161,6 +200,12 @@ fn render_detail(detail: PlaylistDetailSummary, toolbar: Toolbar) -> AnyElement 
     let actions = h_flex()
         .items_center()
         .gap_2()
+        .child(play_button(
+            all_tracks.clone(),
+            player.clone(),
+            primary_foreground,
+        ))
+        .child(shuffle_button(all_tracks, player.clone(), muted))
         .child(share_button(detail.playlist_id, muted));
 
     let search = Input::new(search_input)
@@ -194,12 +239,20 @@ fn render_detail(detail: PlaylistDetailSummary, toolbar: Toolbar) -> AnyElement 
                 .w_full()
                 .min_w_0()
                 .gap_1()
-                .children(
-                    tracks
-                        .iter()
-                        .enumerate()
-                        .map(|(index, track)| render_track(index, track.clone())),
-                ),
+                .children(tracks.iter().enumerate().map(|(index, track)| {
+                    let is_current = now_playing == Some(&track.id);
+                    let is_loading = is_current && now_loading;
+                    let is_playing = is_current && now_playing_actively;
+                    render_track(
+                        index,
+                        track.clone(),
+                        is_current,
+                        is_loading,
+                        is_playing,
+                        tracks.clone(),
+                        player,
+                    )
+                })),
         )
         .into_any_element()
 }
@@ -224,6 +277,43 @@ fn playlist_meta(track_count: Option<usize>, total_duration: Option<&str>) -> Op
         meta.push_str(duration);
     }
     Some(SharedString::from(meta))
+}
+
+pub(crate) fn play_button(
+    tracks: Vec<TrackSummary>,
+    player: Entity<PlayerModel>,
+    foreground: Hsla,
+) -> Button {
+    Button::new("playlist-play")
+        .cursor_pointer()
+        .primary()
+        .rounded(px(6.))
+        .icon(Icon::new(IconName::Play).size_4().text_color(foreground))
+        .label("Play")
+        .disabled(tracks.is_empty())
+        .on_click(move |_, _, cx| {
+            let tracks = tracks.clone();
+            player.update(cx, |model, cx| model.request_play_queue(tracks, 0, cx));
+        })
+}
+
+pub(crate) fn shuffle_button(
+    tracks: Vec<TrackSummary>,
+    player: Entity<PlayerModel>,
+    muted: Hsla,
+) -> Button {
+    Button::new("playlist-shuffle")
+        .cursor_pointer()
+        .ghost()
+        .rounded(px(6.))
+        .icon(Icon::new(IconName::Shuffle).size_4().text_color(muted))
+        .label("Shuffle")
+        .disabled(tracks.is_empty())
+        .on_click(move |_, _, cx| {
+            let mut shuffled = tracks.clone();
+            shuffled.shuffle(&mut rand::rng());
+            player.update(cx, |model, cx| model.request_play_queue(shuffled, 0, cx));
+        })
 }
 
 fn share_button(playlist_id: SharedString, muted: Hsla) -> Button {
@@ -357,9 +447,49 @@ fn duration_secs(duration: &str) -> Option<u64> {
     })
 }
 
-fn render_track(index: usize, track: TrackSummary) -> AnyElement {
+pub(crate) fn render_track(
+    index: usize,
+    track: TrackSummary,
+    is_current: bool,
+    is_loading: bool,
+    is_playing: bool,
+    tracks: Vec<TrackSummary>,
+    player: &Entity<PlayerModel>,
+) -> AnyElement {
+    build_track(index, true, track, is_current, is_loading, is_playing, tracks, player)
+}
+
+pub(crate) fn render_unnumbered_track(
+    index: usize,
+    track: TrackSummary,
+    is_current: bool,
+    is_loading: bool,
+    is_playing: bool,
+    tracks: Vec<TrackSummary>,
+    player: &Entity<PlayerModel>,
+) -> AnyElement {
+    build_track(index, false, track, is_current, is_loading, is_playing, tracks, player)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_track(
+    index: usize,
+    numbered: bool,
+    track: TrackSummary,
+    is_current: bool,
+    is_loading: bool,
+    is_playing: bool,
+    tracks: Vec<TrackSummary>,
+    player: &Entity<PlayerModel>,
+) -> AnyElement {
     let item = PlaylistTrackItem::new(format!("track-{}", track.id), track.title.clone())
-        .index(index + 1);
+        .active(is_current)
+        .loading(is_loading)
+        .playing(is_playing);
+    let item = match numbered {
+        true => item.index(index + 1),
+        false => item.overlay(),
+    };
     let item = match track.artist {
         Some(artist) => item.artist(artist),
         None => item,
@@ -373,7 +503,12 @@ fn render_track(index: usize, track: TrackSummary) -> AnyElement {
         None => item,
     };
 
-    item.into_any_element()
+    let player = player.clone();
+    item.on_click(move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+        let tracks = tracks.clone();
+        player.update(cx, |model, cx| model.request_track_click(tracks, index, cx));
+    })
+    .into_any_element()
 }
 
 #[cfg(test)]

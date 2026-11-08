@@ -5,6 +5,8 @@ members = [
 	"crates/encore_auth",
 	"crates/encore_core", "crates/encore_storage",
 	"crates/encore_innertube",
+	"crates/encore_player",
+	"crates/encore_stream",
 	"crates/encore_ui",
 ]
 
@@ -16,6 +18,7 @@ license = "GPL-3.0-only"
 [workspace.dependencies]
 gpui-kit = "0.7.3"
 anyhow = "1"
+rand = "0.9"
 thiserror = "2"
 tempfile = "3"
 futures = "0.3.34"
@@ -25,6 +28,8 @@ encore_core = { path = "crates/encore_core" }
 encore_ui = { path = "crates/encore_ui" }
 encore_auth = { path = "crates/encore_auth" }
 encore_innertube = { path = "crates/encore_innertube" }
+encore_player = { path = "crates/encore_player" }
+encore_stream = { path = "crates/encore_stream" }
 encore_storage = { path = "crates/encore_storage" }
 
 [profile.dev]

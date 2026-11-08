@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
+rand.workspace = true

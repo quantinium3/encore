@@ -11,4 +11,7 @@ encore_core.workspace = true
 encore_ui.workspace = true
 encore_auth.workspace = true
 encore_storage.workspace = true
+encore_innertube.workspace = true
+futures.workspace = true
 dirs = "7.0.0"
+reqwest_client = { package = "gpui-pre-reqwest-client", version = "0.3.9" }

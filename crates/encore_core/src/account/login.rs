@@ -2,12 +2,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use thiserror::Error;
 
-use crate::StorageError;
+use crate::{LoginError, StorageError};
 
 #[derive(Debug, Error)]
 pub enum SignInError {
     #[error(transparent)]
-    Login(#[from] LoginError)),
+    Login(#[from] LoginError),
     #[error("the session has no account identity; sign in again")]
     NoIdentity,
     #[error("YouTube rejected the session; sign in again")]

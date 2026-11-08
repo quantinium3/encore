@@ -1,14 +1,4 @@
-const AUTH_COOKIES: [&str; 2] = ["SAPISID", "__Secure-3PAPISID"];
-
-fn sapisid(cookie_header: &str) -> Option<&str> {
-    AUTH_COOKIES.iter().find_map(|wanted| {
-        cookie_header.split(';').find_map(|pair| {
-            let (name, value) = pair.split_once('=')?;
-            let value = value.trim();
-            (name.trim() == *wanted && !value.is_empty()).then_some(value)
-        })
-    })
-}
+use encore_core::sapisid;
 
 pub fn has_session(cookie_header: &str) -> bool {
     sapisid(cookie_header).is_some()

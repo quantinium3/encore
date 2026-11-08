@@ -4,6 +4,7 @@ mod paths;
 mod playback;
 mod playlist_detail;
 mod playlists;
+mod search;
 
 use std::sync::Arc;
 
@@ -39,6 +40,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
     let playlist_detail_wiring = playlist_detail::build(&data_dir)?;
     let playback_wiring = playback::build(&data_dir)?;
     let artist_wiring = artist::build(&data_dir)?;
+    let search_wiring = search::build(&data_dir)?;
     let options = WindowOptions {
         #[cfg(target_os = "linux")]
         window_background: WindowBackgroundAppearance::Transparent,
@@ -54,6 +56,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
         let playlist_detail_model = root.read(cx).playlist_detail().clone();
         let player_model = root.read(cx).player().clone();
         let artist_model = root.read(cx).artist().clone();
+        let search_model = root.read(cx).search().clone();
         accounts::attach(accounts_wiring, &accounts_model, window, cx);
         playlists::attach(
             playlists_wiring,
@@ -71,6 +74,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
         );
         playback::attach(playback_wiring, &player_model, window, cx);
         artist::attach(artist_wiring, &artist_model, window, cx);
+        search::attach(search_wiring, &search_model, window, cx);
         root
     })
     .context("failed to open window")?;

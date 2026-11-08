@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use super::{
     ArtistPage, ArtistProvider, Playlist, PlaylistDetail, PlaylistError, PlaylistProvider,
-    RadioProvider, Track,
+    RadioProvider, SearchKind, SearchProvider, SearchResults, Track,
 };
 use crate::{AccountStore, Session, StorageError};
 
@@ -73,6 +73,22 @@ pub fn fetch_artist(
     };
     let page = provider.artist(&Session::new(account.session_cookie), artist_id)?;
     Ok(page)
+}
+
+pub fn search(
+    store: &impl AccountStore,
+    provider: &impl SearchProvider,
+    kind: SearchKind,
+    query: &str,
+) -> Result<SearchResults, LibraryError> {
+    let Some(id) = store.active()? else {
+        return Err(LibraryError::SignedOut);
+    };
+    let Some(account) = store.get(&id)? else {
+        return Err(LibraryError::SignedOut);
+    };
+    let results = provider.search(&Session::new(account.session_cookie), kind, query)?;
+    Ok(results)
 }
 
 #[cfg(test)]

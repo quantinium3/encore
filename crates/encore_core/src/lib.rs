@@ -11,9 +11,10 @@ pub use account::{
 };
 pub use error::StorageError;
 pub use library::{
-    Album, Artist, ArtistPage, ArtistProvider, LibraryError, Playlist, PlaylistDetail,
-    PlaylistError, PlaylistPrivacy, PlaylistProvider, RadioProvider, Track, fetch_artist,
-    fetch_playlist_detail, fetch_playlists, fetch_radio,
+    Album, Artist, ArtistPage, ArtistProvider, LibraryError, MixedItem, MixedResults, Playlist,
+    PlaylistDetail, PlaylistError, PlaylistPrivacy, PlaylistProvider, RadioProvider, SearchKind,
+    SearchProvider, SearchResults, Track, TopResult, fetch_artist, fetch_playlist_detail,
+    fetch_playlists, fetch_radio, search,
 };
 pub use login::{
     Login, LoginError, LoginProvider, ProfileStore, RefreshError, Session, SessionEvent,

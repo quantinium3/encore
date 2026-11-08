@@ -7,6 +7,6 @@ pub use account::{Account, AccountId, AccountStore};
 pub use error::StorageError;
 pub use login::{
     Login, LoginError, LoginProvider, ProfileStore, RefreshError, Session, SessionEvent,
-    SessionKeeper, SessionRefresher, SessionValidator, ValidationError,
+    SessionKeeper, SessionRefresher, SessionValidator, ValidationError, sapisid,
 };
 pub use settings::{SettingKey, SettingsStore};

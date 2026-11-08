@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use encore_core::{PlaybackQueue, RepeatMode, Track, fetch_radio};
@@ -17,10 +18,15 @@ use thiserror::Error;
 use crate::accounts::{DATABASE_FILE, run_blocking};
 use crate::presence::{Activity, Presence};
 use crate::room::{self, RoomSession};
+use crate::session::{self, SavedSession, Snapshot};
 
 const MAX_RETRIES: u32 = 5;
 
 const AUTOPLAY_LOW_WATER: usize = 3;
+
+const SAVE_INTERVAL: Duration = Duration::from_secs(5);
+
+const MIN_RESUME_SECS: f64 = 1.;
 
 pub(crate) struct Lookahead {
     index: usize,
@@ -48,6 +54,8 @@ pub(crate) struct Playback {
     pub(crate) pending_seek: Arc<Mutex<Option<f64>>>,
     pub(crate) room: Arc<Mutex<RoomSession>>,
     pub(crate) presence: Presence,
+    pub(crate) resume: Arc<Mutex<Option<f64>>>,
+    pub(crate) last_saved: Arc<Mutex<Instant>>,
 }
 
 pub struct Wiring {
@@ -108,8 +116,11 @@ pub fn attach(
         pending_seek: Arc::new(Mutex::new(None)),
         room: Arc::new(Mutex::new(RoomSession::default())),
         presence: Presence::start(),
+        resume: Arc::new(Mutex::new(None)),
+        last_saved: Arc::new(Mutex::new(Instant::now())),
     };
 
+    restore_session(&playback, cx);
     room::attach(&playback, room_model, window, cx);
 
     report(
@@ -129,6 +140,61 @@ pub fn attach(
     listen_for_player_events(playback, events, window, cx);
 }
 
+fn restore_session(playback: &Playback, cx: &mut App) {
+    let Some(saved) = session::load(playback.store.as_ref()) else {
+        return;
+    };
+    let current = saved.current_index();
+    let (position, duration) = (saved.position_secs, saved.duration_secs);
+    let (volume, shuffle, repeat) = (saved.volume_percent, saved.shuffle, saved.repeat);
+    let mut queue = PlaybackQueue::new(saved.into_tracks());
+    queue.play_at(current);
+    queue.set_shuffle(shuffle);
+    queue.set_repeat(match repeat {
+        true => RepeatMode::All,
+        false => RepeatMode::Off,
+    });
+    let summaries: Vec<TrackSummary> = queue.tracks().iter().map(to_ui_track).collect();
+    *lock(&playback.queue) = queue;
+    *lock(&playback.resume) = Some(position);
+    playback.model.update(cx, |model, cx| {
+        model.restore_session(summaries, current, position, duration, cx);
+        model.set_volume_percent(volume, cx);
+        model.set_shuffle(shuffle, cx);
+        model.set_repeat(repeat, cx);
+    });
+}
+
+fn save_session(playback: &Playback, cx: &mut App) {
+    if room::active(playback) {
+        return;
+    }
+    *lock(&playback.last_saved) = Instant::now();
+    let resume = (*lock(&playback.resume)).or(*lock(&playback.pending_seek));
+    let saved = {
+        let playing = lock(&playback.queue);
+        let Some(current) = playing.current_index() else {
+            return;
+        };
+        let model = playback.model.read(cx);
+        SavedSession::from_snapshot(Snapshot {
+            tracks: playing.tracks(),
+            current,
+            position_secs: resume.unwrap_or_else(|| model.position_secs()),
+            duration_secs: model.duration_secs(),
+            volume_percent: model.volume_percent(),
+            shuffle: playing.shuffle(),
+            repeat: playing.repeat() != RepeatMode::Off,
+        })
+    };
+    let store = playback.store.clone();
+    std::thread::spawn(move || {
+        if let Err(error) = session::save(store.as_ref(), &saved) {
+            eprintln!("encore: could not save the playback session: {error:#}");
+        }
+    });
+}
+
 fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window, cx: &mut App) {
     if room::route(playback, event, cx) {
         return;
@@ -145,7 +211,17 @@ fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window,
             play_current(playback, window, cx);
         }
         PlayerEvent::PlayPauseRequested => {
-            report(playback.player.toggle_play_pause(), "toggle playback");
+            let resume = lock(&playback.resume).take();
+            match resume {
+                Some(position) => {
+                    play_current(playback, window, cx);
+                    if position >= MIN_RESUME_SECS {
+                        *lock(&playback.pending_seek) = Some(position);
+                        save_session(playback, cx);
+                    }
+                }
+                None => report(playback.player.toggle_play_pause(), "toggle playback"),
+            }
         }
         PlayerEvent::NextRequested => {
             lock(&playback.queue).skip_forward();
@@ -166,6 +242,7 @@ fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window,
             playback
                 .model
                 .update(cx, |model, cx| model.set_shuffle(shuffle, cx));
+            save_session(playback, cx);
         }
         PlayerEvent::RepeatToggleRequested => {
             let repeat_on = {
@@ -182,15 +259,24 @@ fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window,
             playback
                 .model
                 .update(cx, |model, cx| model.set_repeat(repeat_on, cx));
+            save_session(playback, cx);
         }
         PlayerEvent::SeekRequested(position) => {
-            report(playback.player.seek(*position), "seek");
+            let mut resume = lock(&playback.resume);
+            match resume.as_mut() {
+                Some(pending) => *pending = *position,
+                None => {
+                    drop(resume);
+                    report(playback.player.seek(*position), "seek");
+                }
+            }
         }
         PlayerEvent::VolumeRequested(percent) => {
             report(playback.player.set_volume(*percent), "set the volume");
             playback
                 .model
                 .update(cx, |model, cx| model.set_volume_percent(*percent, cx));
+            save_session(playback, cx);
         }
     }
 }
@@ -198,6 +284,7 @@ fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window,
 pub(crate) fn play_current(playback: &Playback, window: &mut Window, cx: &mut App) {
     playback.generation.fetch_add(1, Ordering::SeqCst);
     *lock(&playback.lookahead) = None;
+    *lock(&playback.resume) = None;
     *lock(&playback.pending_seek) = None;
 
     let video_id = lock(&playback.queue)
@@ -241,6 +328,7 @@ pub(crate) fn publish_queue(playback: &Playback, cx: &mut App) {
     playback
         .model
         .update(cx, |model, cx| model.set_queue(summaries, current_index, cx));
+    save_session(playback, cx);
 }
 
 fn reset_lookahead(playback: &Playback, window: &mut Window, cx: &mut App) {
@@ -444,6 +532,7 @@ fn top_up_radio(playback: &Playback, window: &mut Window, cx: &mut App) {
                     let summaries: Vec<TrackSummary> = added.iter().map(to_ui_track).collect();
                     cx.update(|window, cx| {
                         model.update(cx, |model, cx| model.append_queue(summaries, cx));
+                        save_session(&playback, cx);
                         prime_lookahead(&playback, window, cx);
                     })
                     .ok();
@@ -520,6 +609,10 @@ fn listen_for_player_events(
                             .model
                             .update(cx, |model, cx| model.set_position_secs(position, cx));
                         room::resync(&playback, cx, false);
+                        let due = lock(&playback.last_saved).elapsed() >= SAVE_INTERVAL;
+                        if due {
+                            save_session(&playback, cx);
+                        }
                     }
                     encore_player::PlayerEvent::Duration(duration) => {
                         playback
@@ -540,6 +633,7 @@ fn listen_for_player_events(
                             .update(cx, |model, cx| model.set_playing(playing, cx));
                         update_presence(&playback, cx);
                         room::enforce(&playback, cx);
+                        save_session(&playback, cx);
                     }
                     encore_player::PlayerEvent::TrackEnded => {
                         on_track_ended(&playback, window, cx);

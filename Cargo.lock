@@ -1883,6 +1883,8 @@ dependencies = [
  "futures",
  "gpui-kit",
  "gpui-pre-reqwest-client",
+ "serde",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 

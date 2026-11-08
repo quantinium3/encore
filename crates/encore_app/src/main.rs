@@ -7,6 +7,7 @@ mod playlists;
 mod presence;
 mod room;
 mod search;
+mod session;
 
 use std::sync::Arc;
 

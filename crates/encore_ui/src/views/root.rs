@@ -18,12 +18,12 @@ use crate::playlists::PlaylistsModel;
 use crate::room::RoomModel;
 use crate::search::SearchModel;
 use gpui_kit::{
-    AppContext as _, Context, ElementId, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, Styled as _, Subscription, Task, Window,
+    AppContext as _, Context, ElementId, Entity, IntoElement, ParentElement as _, Render,
+    Styled as _, Subscription, Task, Window,
     assets::IconName,
     base::{h_flex, v_flex},
     component::{
-        ActiveTheme as _, Disableable as _, Icon,
+        ActiveTheme as _, Disableable as _, Icon, Sizable as _,
         button::{Button, ButtonVariants as _},
         input::{Input, InputEvent, InputState},
         scroll::ScrollableElement as _,

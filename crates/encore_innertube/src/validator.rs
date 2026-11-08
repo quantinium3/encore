@@ -1,11 +1,13 @@
 use std::sync::Mutex;
 
 use encore_core::{
-    AccountId, Playlist, PlaylistDetail, PlaylistError, PlaylistProvider, RadioProvider, Session,
-    SessionValidator, Track, ValidationError, VerifiedSession, sapisid,
+    AccountId, ArtistPage, ArtistProvider, Playlist, PlaylistDetail, PlaylistError,
+    PlaylistProvider, RadioProvider, Session, SessionValidator, Track, ValidationError,
+    VerifiedSession, sapisid,
 };
 use serde_json::json;
 
+use crate::artist::parse_artist_page;
 use crate::error::Error;
 use crate::identity::{
     AccountMenu, parse_account_menu, parse_selected_identity, parse_visitor_data,
@@ -204,6 +206,18 @@ impl RadioProvider for InnertubeValidator {
             .map_err(playlist_backend)?;
         match reply.status {
             200..=299 => parse_radio(&reply.body, video_id)
+                .map_err(|error| playlist_backend(Error::Response(error))),
+            401 | 403 => Err(PlaylistError::Rejected),
+            status => Err(playlist_backend(Error::Status(status))),
+        }
+    }
+}
+
+impl ArtistProvider for InnertubeValidator {
+    fn artist(&self, session: &Session, artist_id: &str) -> Result<ArtistPage, PlaylistError> {
+        let reply = self.browse(session, artist_id)?;
+        match reply.status {
+            200..=299 => parse_artist_page(&reply.body)
                 .map_err(|error| playlist_backend(Error::Response(error))),
             401 | 403 => Err(PlaylistError::Rejected),
             status => Err(playlist_backend(Error::Status(status))),

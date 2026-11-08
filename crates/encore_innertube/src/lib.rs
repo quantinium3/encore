@@ -1,3 +1,4 @@
+mod artist;
 mod auth;
 mod error;
 mod identity;

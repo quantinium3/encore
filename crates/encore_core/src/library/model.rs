@@ -37,3 +37,33 @@ pub struct PlaylistDetail {
     pub privacy: Option<PlaylistPrivacy>,
     pub tracks: Vec<Track>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Album {
+    pub id: String,
+    pub title: String,
+    pub artist: Option<String>,
+    pub year: Option<String>,
+    pub thumbnail_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Artist {
+    pub id: String,
+    pub name: String,
+    pub subscribers: Option<String>,
+    pub thumbnail_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtistPage {
+    pub name: String,
+    pub description: Option<String>,
+    pub subscribers: Option<String>,
+    pub header_image_url: Option<String>,
+    pub tracks: Vec<Track>,
+    pub tracks_playlist_id: Option<String>,
+    pub albums: Vec<Album>,
+    pub singles: Vec<Album>,
+    pub similar_artists: Vec<Artist>,
+}

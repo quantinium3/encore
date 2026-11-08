@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{Playlist, PlaylistDetail, Track};
+use super::{ArtistPage, Playlist, PlaylistDetail, Track};
 use crate::Session;
 
 pub trait PlaylistProvider {
@@ -11,6 +11,10 @@ pub trait PlaylistProvider {
         session: &Session,
         playlist_id: &str,
     ) -> Result<PlaylistDetail, PlaylistError>;
+}
+
+pub trait ArtistProvider {
+    fn artist(&self, session: &Session, artist_id: &str) -> Result<ArtistPage, PlaylistError>;
 }
 
 pub trait RadioProvider {

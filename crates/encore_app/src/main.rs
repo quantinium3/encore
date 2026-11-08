@@ -1,4 +1,5 @@
 mod accounts;
+mod artist;
 mod paths;
 mod playback;
 mod playlist_detail;
@@ -37,6 +38,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
     let playlists_wiring = playlists::build(&data_dir)?;
     let playlist_detail_wiring = playlist_detail::build(&data_dir)?;
     let playback_wiring = playback::build(&data_dir)?;
+    let artist_wiring = artist::build(&data_dir)?;
     let options = WindowOptions {
         #[cfg(target_os = "linux")]
         window_background: WindowBackgroundAppearance::Transparent,
@@ -51,6 +53,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
         let playlists_model = root.read(cx).playlists().clone();
         let playlist_detail_model = root.read(cx).playlist_detail().clone();
         let player_model = root.read(cx).player().clone();
+        let artist_model = root.read(cx).artist().clone();
         accounts::attach(accounts_wiring, &accounts_model, window, cx);
         playlists::attach(
             playlists_wiring,
@@ -67,6 +70,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
             cx,
         );
         playback::attach(playback_wiring, &player_model, window, cx);
+        artist::attach(artist_wiring, &artist_model, window, cx);
         root
     })
     .context("failed to open window")?;

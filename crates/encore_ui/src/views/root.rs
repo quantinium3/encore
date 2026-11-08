@@ -23,7 +23,7 @@ use gpui_kit::{
     assets::IconName,
     base::{h_flex, v_flex},
     component::{
-        ActiveTheme as _, Disableable as _, Icon, Sizable as _,
+        ActiveTheme as _, Disableable as _, Icon, Sizable as _, Theme, ThemeMode,
         button::{Button, ButtonVariants as _},
         input::{Input, InputEvent, InputState},
         scroll::ScrollableElement as _,
@@ -262,6 +262,7 @@ impl Render for DesktopRoot {
         let can_back = self.history.can_go_back();
         let can_forward = self.history.can_go_forward();
         let theme = cx.theme();
+        let is_dark = theme.is_dark();
         let room_open = self.room.read(cx).is_open();
         v_flex()
             .size_full()
@@ -345,13 +346,39 @@ impl Render for DesktopRoot {
                                             ),
                                     )
                                     .child(
-                                        Input::new(&self.global_search)
-                                            .w(px(360.))
-                                            .cleanable(true)
-                                            .prefix(
-                                                Icon::new(IconName::Search)
-                                                    .size_3p5()
-                                                    .text_color(theme.muted_foreground),
+                                        h_flex()
+                                            .items_center()
+                                            .gap_2()
+                                            .child(
+                                                Input::new(&self.global_search)
+                                                    .w(px(360.))
+                                                    .cleanable(true)
+                                                    .prefix(
+                                                        Icon::new(IconName::Search)
+                                                            .size_3p5()
+                                                            .text_color(theme.muted_foreground),
+                                                    ),
+                                            )
+                                            .child(
+                                                Button::new("theme-toggle")
+                                                    .cursor_pointer()
+                                                    .ghost()
+                                                    .small()
+                                                    .icon(
+                                                        Icon::new(match is_dark {
+                                                            true => IconName::Sun,
+                                                            false => IconName::Moon,
+                                                        })
+                                                        .size_4(),
+                                                    )
+                                                    .on_click(cx.listener(|_, _, window, cx| {
+                                                        let mode = match Theme::global(cx).is_dark()
+                                                        {
+                                                            true => ThemeMode::Light,
+                                                            false => ThemeMode::Dark,
+                                                        };
+                                                        Theme::change(mode, Some(window), cx);
+                                                    })),
                                             ),
                                     ),
                             )

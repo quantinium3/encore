@@ -4,7 +4,7 @@ jobs:
   Explore-Github-Actions:
     runs-on: ubuntu-latest
     steps:
-      - run: actions/checkout@v6
-      - run: cargo build --release --workspaces --bins
+      - uses: actions/checkout@v6
+      - run: cargo build --release --workspace --bins
       - run: cargo test --workspace
       - run: cargo package

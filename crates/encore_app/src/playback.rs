@@ -1,8 +1,12 @@
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use encore_core::{PlaybackQueue, RepeatMode, Track};
+use anyhow::Context as _;
+use encore_core::{PlaybackQueue, RepeatMode, Track, fetch_radio};
+use encore_innertube::InnertubeValidator;
 use encore_player::{Player, PlayerError};
+use encore_storage::SqliteStore;
 use encore_stream::{ResolveError, StreamResolver, StreamSource};
 use encore_ui::{PlayerEvent, PlayerModel, TrackSummary};
 use futures::StreamExt as _;
@@ -10,9 +14,11 @@ use futures::channel::mpsc::{UnboundedReceiver, unbounded};
 use gpui_kit::{App, Entity, SharedString, Window};
 use thiserror::Error;
 
-use crate::accounts::run_blocking;
+use crate::accounts::{DATABASE_FILE, run_blocking};
 
 const MAX_RETRIES: u32 = 5;
+
+const AUTOPLAY_LOW_WATER: usize = 3;
 
 pub(crate) struct Lookahead {
     index: usize,
@@ -31,6 +37,9 @@ pub(crate) struct Playback {
     pub(crate) last_attempt: LastAttempt,
     pub(crate) retry_count: RetryCount,
     pub(crate) model: Entity<PlayerModel>,
+    pub(crate) store: Arc<SqliteStore>,
+    pub(crate) validator: Arc<InnertubeValidator>,
+    pub(crate) fetching_radio: Arc<AtomicBool>,
     pub(crate) lookahead: Arc<Mutex<Option<Lookahead>>>,
     pub(crate) generation: Arc<AtomicU64>,
     pub(crate) priming: Arc<AtomicBool>,
@@ -40,9 +49,11 @@ pub struct Wiring {
     player: Arc<Player>,
     resolver: Arc<StreamResolver>,
     events: UnboundedReceiver<encore_player::PlayerEvent>,
+    store: Arc<SqliteStore>,
+    validator: Arc<InnertubeValidator>,
 }
 
-pub fn build() -> anyhow::Result<Wiring> {
+pub fn build(data_dir: &Path) -> anyhow::Result<Wiring> {
     let (sender, events) = unbounded();
     let player = Player::new(move |event| {
         let _ = sender.unbounded_send(event);
@@ -54,6 +65,11 @@ pub fn build() -> anyhow::Result<Wiring> {
         player: Arc::new(player),
         resolver: Arc::new(resolver),
         events,
+        store: Arc::new(
+            SqliteStore::new(data_dir.join(DATABASE_FILE))
+                .context("could not open the database")?,
+        ),
+        validator: Arc::new(InnertubeValidator::new()),
     })
 }
 
@@ -62,6 +78,8 @@ pub fn attach(wiring: Wiring, model: &Entity<PlayerModel>, window: &mut Window, 
         player,
         resolver,
         events,
+        store,
+        validator,
     } = wiring;
     let playback = Playback {
         player,
@@ -70,6 +88,9 @@ pub fn attach(wiring: Wiring, model: &Entity<PlayerModel>, window: &mut Window, 
         last_attempt: Arc::new(Mutex::new(None)),
         retry_count: Arc::new(Mutex::new(None)),
         model: model.clone(),
+        store,
+        validator,
+        fetching_radio: Arc::new(AtomicBool::new(false)),
         lookahead: Arc::new(Mutex::new(None)),
         generation: Arc::new(AtomicU64::new(0)),
         priming: Arc::new(AtomicBool::new(false)),
@@ -163,6 +184,8 @@ pub(crate) fn play_current(playback: &Playback, window: &mut Window, cx: &mut Ap
         .current_track()
         .map(|track| track.id.clone());
     publish_queue(playback, cx);
+
+    top_up_radio(playback, window, cx);
 
     let Some(video_id) = video_id else { return };
     let player = playback.player.clone();
@@ -343,6 +366,7 @@ fn on_track_ended(playback: &Playback, window: &mut Window, cx: &mut App) {
             lock(&playback.queue).advance();
             *lock(&playback.last_attempt) = Some((primed.video_id, primed.source));
             publish_queue(playback, cx);
+            top_up_radio(playback, window, cx);
             prime_lookahead(playback, window, cx);
         }
         _ => {
@@ -350,6 +374,51 @@ fn on_track_ended(playback: &Playback, window: &mut Window, cx: &mut App) {
             play_current(playback, window, cx);
         }
     }
+}
+
+fn top_up_radio(playback: &Playback, window: &mut Window, cx: &mut App) {
+    let seed = {
+        let playing = lock(&playback.queue);
+        if playing.current_index().is_none() || playing.remaining() > AUTOPLAY_LOW_WATER {
+            return;
+        }
+        match playing.tracks().last() {
+            Some(last) => last.id.clone(),
+            None => return,
+        }
+    };
+    if playback.fetching_radio.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let store = playback.store.clone();
+    let validator = playback.validator.clone();
+    let queue = playback.queue.clone();
+    let model = playback.model.clone();
+    let fetching = playback.fetching_radio.clone();
+    let playback = playback.clone();
+    window
+        .spawn(cx, async move |cx| {
+            let result = run_blocking(move || {
+                fetch_radio(store.as_ref(), validator.as_ref(), &seed).map_err(|e| e.to_string())
+            })
+            .await;
+            match result {
+                Some(Ok(tracks)) => {
+                    let added = lock(&queue).append(tracks);
+                    let summaries: Vec<TrackSummary> = added.iter().map(to_ui_track).collect();
+                    cx.update(|window, cx| {
+                        model.update(cx, |model, cx| model.append_queue(summaries, cx));
+                        prime_lookahead(&playback, window, cx);
+                    })
+                    .ok();
+                }
+                Some(Err(error)) => eprintln!("encore: could not load more tracks: {error}"),
+                None => eprintln!("encore: the background task stopped unexpectedly."),
+            }
+            fetching.store(false, Ordering::SeqCst);
+        })
+        .detach();
 }
 
 fn retry_via_yt_dlp(playback: &Playback, video_id: String, window: &mut Window, cx: &mut App) {

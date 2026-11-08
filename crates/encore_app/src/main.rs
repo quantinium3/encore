@@ -36,7 +36,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
     let accounts_wiring = accounts::build(&data_dir)?;
     let playlists_wiring = playlists::build(&data_dir)?;
     let playlist_detail_wiring = playlist_detail::build(&data_dir)?;
-    let playback_wiring = playback::build()?;
+    let playback_wiring = playback::build(&data_dir)?;
     let options = WindowOptions {
         #[cfg(target_os = "linux")]
         window_background: WindowBackgroundAppearance::Transparent,

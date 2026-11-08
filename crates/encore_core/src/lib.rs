@@ -12,7 +12,7 @@ pub use account::{
 pub use error::StorageError;
 pub use library::{
     LibraryError, Playlist, PlaylistDetail, PlaylistError, PlaylistPrivacy, PlaylistProvider,
-    Track, fetch_playlist_detail, fetch_playlists,
+    RadioProvider, Track, fetch_playlist_detail, fetch_playlists, fetch_radio,
 };
 pub use login::{
     Login, LoginError, LoginProvider, ProfileStore, RefreshError, Session, SessionEvent,

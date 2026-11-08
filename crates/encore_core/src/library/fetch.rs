@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{Playlist, PlaylistDetail, PlaylistError, PlaylistProvider};
+use super::{Playlist, PlaylistDetail, PlaylistError, PlaylistProvider, RadioProvider, Track};
 use crate::{AccountStore, Session, StorageError};
 
 #[derive(Debug, Error)]
@@ -40,6 +40,21 @@ pub fn fetch_playlist_detail(
     };
     let detail = provider.playlist(&Session::new(account.session_cookie), playlist_id)?;
     Ok(detail)
+}
+
+pub fn fetch_radio(
+    store: &impl AccountStore,
+    provider: &impl RadioProvider,
+    video_id: &str,
+) -> Result<Vec<Track>, LibraryError> {
+    let Some(id) = store.active()? else {
+        return Err(LibraryError::SignedOut);
+    };
+    let Some(account) = store.get(&id)? else {
+        return Err(LibraryError::SignedOut);
+    };
+    let tracks = provider.radio(&Session::new(account.session_cookie), video_id)?;
+    Ok(tracks)
 }
 
 #[cfg(test)]

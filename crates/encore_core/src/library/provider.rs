@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{Playlist, PlaylistDetail};
+use super::{Playlist, PlaylistDetail, Track};
 use crate::Session;
 
 pub trait PlaylistProvider {
@@ -11,6 +11,10 @@ pub trait PlaylistProvider {
         session: &Session,
         playlist_id: &str,
     ) -> Result<PlaylistDetail, PlaylistError>;
+}
+
+pub trait RadioProvider {
+    fn radio(&self, session: &Session, video_id: &str) -> Result<Vec<Track>, PlaylistError>;
 }
 
 #[derive(Debug, Error)]

@@ -1,8 +1,8 @@
 use std::sync::Mutex;
 
 use encore_core::{
-    AccountId, Playlist, PlaylistDetail, PlaylistError, PlaylistProvider, Session,
-    SessionValidator, ValidationError, VerifiedSession, sapisid,
+    AccountId, Playlist, PlaylistDetail, PlaylistError, PlaylistProvider, RadioProvider, Session,
+    SessionValidator, Track, ValidationError, VerifiedSession, sapisid,
 };
 use serde_json::json;
 
@@ -12,11 +12,13 @@ use crate::identity::{
 };
 use crate::playlist_detail::parse_playlist_detail;
 use crate::playlists::{LIBRARY_PLAYLISTS_BROWSE_ID, parse_library_playlists};
+use crate::radio::{RADIO_PARAMS, RADIO_PLAYLIST_PREFIX, parse_radio};
 use crate::transport::Transport;
 
 const ACCOUNT_MENU: &str = "account/account_menu";
 const ACCOUNTS_LIST: &str = "account/accounts_list";
 const BROWSE: &str = "browse";
+const NEXT: &str = "next";
 
 pub struct InnertubeValidator {
     transport: Transport,
@@ -176,6 +178,32 @@ impl PlaylistProvider for InnertubeValidator {
         let reply = self.browse(session, playlist_id)?;
         match reply.status {
             200..=299 => parse_playlist_detail(&reply.body)
+                .map_err(|error| playlist_backend(Error::Response(error))),
+            401 | 403 => Err(PlaylistError::Rejected),
+            status => Err(playlist_backend(Error::Status(status))),
+        }
+    }
+}
+
+impl RadioProvider for InnertubeValidator {
+    fn radio(&self, session: &Session, video_id: &str) -> Result<Vec<Track>, PlaylistError> {
+        let sapisid = match sapisid(session.cookie()) {
+            Some(sapisid) => sapisid,
+            None => return Err(PlaylistError::Rejected),
+        };
+        let visitor = self.anonymous_visitor();
+        let body = json!({
+            "videoId": video_id,
+            "playlistId": format!("{RADIO_PLAYLIST_PREFIX}{video_id}"),
+            "params": RADIO_PARAMS,
+            "isAudioOnly": true,
+        });
+        let reply = self
+            .transport
+            .post(NEXT, session.cookie(), sapisid, visitor.as_deref(), body)
+            .map_err(playlist_backend)?;
+        match reply.status {
+            200..=299 => parse_radio(&reply.body, video_id)
                 .map_err(|error| playlist_backend(Error::Response(error))),
             401 | 403 => Err(PlaylistError::Rejected),
             status => Err(playlist_backend(Error::Status(status))),

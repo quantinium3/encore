@@ -1,5 +1,6 @@
 mod accounts;
 mod paths;
+mod playlist_detail;
 mod playlists;
 
 use std::sync::Arc;
@@ -33,6 +34,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
     let data_dir = paths::data_dir()?;
     let accounts_wiring = accounts::build(&data_dir)?;
     let playlists_wiring = playlists::build(&data_dir)?;
+    let playlist_detail_wiring = playlist_detail::build(&data_dir)?;
     let options = WindowOptions {
         #[cfg(target_os = "linux")]
         window_background: WindowBackgroundAppearance::Transparent,
@@ -45,11 +47,19 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
         let root = cx.new(|cx| encore_ui::DesktopRoot::new(window, cx));
         let accounts_model = root.read(cx).accounts().clone();
         let playlists_model = root.read(cx).playlists().clone();
+        let playlist_detail_model = root.read(cx).playlist_detail().clone();
         accounts::attach(accounts_wiring, &accounts_model, window, cx);
         playlists::attach(
             playlists_wiring,
             &accounts_model,
             &playlists_model,
+            window,
+            cx,
+        );
+        playlist_detail::attach(
+            playlist_detail_wiring,
+            &playlists_model,
+            &playlist_detail_model,
             window,
             cx,
         );

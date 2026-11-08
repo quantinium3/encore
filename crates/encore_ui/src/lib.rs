@@ -2,6 +2,7 @@ mod accounts;
 mod artist;
 mod assets;
 mod components;
+mod navigation;
 mod player;
 mod playlist_detail;
 mod playlists;

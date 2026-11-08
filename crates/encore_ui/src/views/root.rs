@@ -7,18 +7,27 @@ use crate::components::player::queue_panel::{QueuePanel, QueuePanelState};
 use crate::components::player::view::PlayerBarView;
 use crate::components::playlist::detail::PlaylistDetailView;
 use crate::components::sidebar::panel::PlaylistsPanel;
+use crate::navigation::{History, Location};
 use crate::player::PlayerModel;
 use crate::playlist_detail::PlaylistDetailModel;
 use crate::playlists::PlaylistsModel;
 use gpui_kit::{
     AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
     Render, Styled as _, Subscription, Window,
+    assets::IconName,
     base::{h_flex, v_flex},
-    component::{input::InputState, scroll::ScrollableElement as _},
+    component::{
+        ActiveTheme as _, Disableable as _, Icon,
+        button::{Button, ButtonVariants as _},
+        input::InputState,
+        scroll::ScrollableElement as _,
+    },
+    div, px,
     prelude::FluentBuilder as _,
 };
 
 pub struct DesktopRoot {
+    history: History<Location>,
     sidebar_collapsed: bool,
     accounts: Entity<AccountsModel>,
     account_switcher: Entity<AccountSwitcher>,
@@ -55,14 +64,21 @@ impl DesktopRoot {
         let queue_panel = cx.new(|cx| QueuePanel::new(player.clone(), queue_state.clone(), cx));
         let player_bar = cx.new(|cx| PlayerBarView::new(player.clone(), queue_state.clone(), cx));
 
-        let subscriptions = vec![cx.observe(&playlists, {
-            let artist = artist.clone();
-            move |_, _, cx| {
-                artist.update(cx, |model, cx| model.clear(cx));
-            }
-        })];
+        let subscriptions = vec![
+            cx.observe(&playlists, {
+                let artist = artist.clone();
+                move |this, _, cx| {
+                    artist.update(cx, |model, cx| model.clear(cx));
+                    this.record_location(cx);
+                }
+            }),
+            cx.observe(&artist, |this, _, cx| {
+                this.record_location(cx);
+            }),
+        ];
 
         Self {
+            history: History::default(),
             sidebar_collapsed: false,
             accounts,
             account_switcher,
@@ -78,6 +94,46 @@ impl DesktopRoot {
             queue_panel,
             _subscriptions: subscriptions,
         }
+    }
+
+    fn current_location(&self, cx: &Context<Self>) -> Location {
+        match self.artist.read(cx).active() {
+            Some(artist_id) => Location::Artist(artist_id.clone()),
+            None => Location::Playlist(self.playlists.read(cx).active().cloned()),
+        }
+    }
+
+    fn record_location(&mut self, cx: &mut Context<Self>) {
+        let location = self.current_location(cx);
+        self.history.record(location);
+        cx.notify();
+    }
+
+    fn go_back(&mut self, cx: &mut Context<Self>) {
+        if let Some(location) = self.history.go_back() {
+            self.show(location, cx);
+        }
+    }
+
+    fn go_forward(&mut self, cx: &mut Context<Self>) {
+        if let Some(location) = self.history.go_forward() {
+            self.show(location, cx);
+        }
+    }
+
+    fn show(&mut self, location: Location, cx: &mut Context<Self>) {
+        match location {
+            Location::Playlist(id) => {
+                self.artist.update(cx, |model, cx| model.clear(cx));
+                if let Some(id) = id {
+                    self.playlists.update(cx, |model, cx| model.select(id, cx));
+                }
+            }
+            Location::Artist(id) => {
+                self.artist.update(cx, |model, cx| model.select(id, cx));
+            }
+        }
+        cx.notify();
     }
 
     pub fn accounts(&self) -> &Entity<AccountsModel> {
@@ -104,6 +160,9 @@ impl DesktopRoot {
 impl Render for DesktopRoot {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let active_artist = self.artist.read(cx).active().is_some();
+        let can_back = self.history.can_go_back();
+        let can_forward = self.history.can_go_forward();
+        let theme = cx.theme();
         v_flex()
             .size_full()
             .child(Header::new(
@@ -133,12 +192,42 @@ impl Render for DesktopRoot {
                                 "main-content-playlist",
                             ),
                         };
-                        h_flex()
-                            .id(id)
+                        div()
                             .flex_1()
                             .min_w_0()
+                            .child(
+                                h_flex().w_full().px_4().pt_3().items_center().child(
+                                    h_flex()
+                                        .rounded(px(99.))
+                                        .border_1()
+                                        .border_color(theme.border)
+                                        .child(
+                                            Button::new("history-back")
+                                                .cursor_pointer()
+                                                .ghost()
+                                                .xsmall()
+                                                .disabled(!can_back)
+                                                .icon(Icon::new(IconName::ChevronLeft).size_4())
+                                                .on_click(cx.listener(|this, _, _, cx| {
+                                                    this.go_back(cx)
+                                                })),
+                                        )
+                                        .child(
+                                            Button::new("history-forward")
+                                                .cursor_pointer()
+                                                .ghost()
+                                                .xsmall()
+                                                .disabled(!can_forward)
+                                                .icon(Icon::new(IconName::ChevronRight).size_4())
+                                                .on_click(cx.listener(|this, _, _, cx| {
+                                                    this.go_forward(cx)
+                                                })),
+                                        ),
+                                ),
+                            )
                             .child(content)
                             .overflow_y_scrollbar()
+                            .id(id)
                     })
                     .when(self.queue_state.read(cx).is_open(), |this| {
                         this.child(self.queue_panel.clone())

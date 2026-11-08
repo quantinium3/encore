@@ -2,8 +2,8 @@ use std::sync::Mutex;
 
 use encore_core::{
     AccountId, ArtistPage, ArtistProvider, Playlist, PlaylistDetail, PlaylistError,
-    PlaylistProvider, RadioProvider, Session, SessionValidator, Track, ValidationError,
-    VerifiedSession, sapisid,
+    PlaylistProvider, RadioProvider, SearchKind, SearchProvider, SearchResults, Session,
+    SessionValidator, Track, ValidationError, VerifiedSession, sapisid,
 };
 use serde_json::json;
 
@@ -15,11 +15,17 @@ use crate::identity::{
 use crate::playlist_detail::parse_playlist_detail;
 use crate::playlists::{LIBRARY_PLAYLISTS_BROWSE_ID, parse_library_playlists};
 use crate::radio::{RADIO_PARAMS, RADIO_PLAYLIST_PREFIX, parse_radio};
+use crate::search::{
+    ALBUMS_FILTER, ARTISTS_FILTER, PLAYLISTS_FILTER, SONGS_FILTER, VIDEOS_FILTER,
+    parse_album_search, parse_artist_search, parse_mixed_search, parse_playlist_search,
+    parse_song_search,
+};
 use crate::transport::Transport;
 
 const ACCOUNT_MENU: &str = "account/account_menu";
 const ACCOUNTS_LIST: &str = "account/accounts_list";
 const BROWSE: &str = "browse";
+const SEARCH: &str = "search";
 const NEXT: &str = "next";
 
 pub struct InnertubeValidator {
@@ -223,6 +229,54 @@ impl ArtistProvider for InnertubeValidator {
             status => Err(playlist_backend(Error::Status(status))),
         }
     }
+}
+
+impl SearchProvider for InnertubeValidator {
+    fn search(
+        &self,
+        session: &Session,
+        kind: SearchKind,
+        query: &str,
+    ) -> Result<SearchResults, PlaylistError> {
+        let sapisid = match sapisid(session.cookie()) {
+            Some(sapisid) => sapisid,
+            None => return Err(PlaylistError::Rejected),
+        };
+        let visitor = self.anonymous_visitor();
+        let params = match kind {
+            SearchKind::All => None,
+            SearchKind::Songs => Some(SONGS_FILTER),
+            SearchKind::Videos => Some(VIDEOS_FILTER),
+            SearchKind::Albums => Some(ALBUMS_FILTER),
+            SearchKind::Artists => Some(ARTISTS_FILTER),
+            SearchKind::Playlists => Some(PLAYLISTS_FILTER),
+        };
+        let body = match params {
+            Some(params) => json!({ "query": query, "params": params }),
+            None => json!({ "query": query }),
+        };
+        let reply = self
+            .transport
+            .post(SEARCH, session.cookie(), sapisid, visitor.as_deref(), body)
+            .map_err(playlist_backend)?;
+        match reply.status {
+            200..=299 => parse_results(kind, &reply.body)
+                .map_err(|error| playlist_backend(Error::Response(error))),
+            401 | 403 => Err(PlaylistError::Rejected),
+            status => Err(playlist_backend(Error::Status(status))),
+        }
+    }
+}
+
+fn parse_results(kind: SearchKind, body: &str) -> Result<SearchResults, serde_json::Error> {
+    Ok(match kind {
+        SearchKind::All => SearchResults::All(parse_mixed_search(body)?),
+        SearchKind::Songs => SearchResults::Songs(parse_song_search(body)?),
+        SearchKind::Videos => SearchResults::Videos(parse_song_search(body)?),
+        SearchKind::Albums => SearchResults::Albums(parse_album_search(body)?),
+        SearchKind::Artists => SearchResults::Artists(parse_artist_search(body)?),
+        SearchKind::Playlists => SearchResults::Playlists(parse_playlist_search(body)?),
+    })
 }
 
 fn no_identity(menu: &AccountMenu, accounts_list: &str) -> ValidationError {

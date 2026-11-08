@@ -1,0 +1,11 @@
+[package]
+name = "encore_player"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+libmpv2 = "4"
+libmpv2-sys = "4"
+libc = "0.2"

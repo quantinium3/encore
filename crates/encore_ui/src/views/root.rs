@@ -8,12 +8,14 @@ use crate::components::layout::{header::Header, sidebar::AppSidebar};
 use crate::components::player::queue_panel::{QueuePanel, QueuePanelState};
 use crate::components::player::view::PlayerBarView;
 use crate::components::playlist::detail::PlaylistDetailView;
+use crate::components::room::panel::RoomPanel;
 use crate::components::search::view::SearchView;
 use crate::components::sidebar::panel::PlaylistsPanel;
 use crate::navigation::{History, Location};
 use crate::player::PlayerModel;
 use crate::playlist_detail::PlaylistDetailModel;
 use crate::playlists::PlaylistsModel;
+use crate::room::RoomModel;
 use crate::search::SearchModel;
 use gpui_kit::{
     AppContext as _, Context, ElementId, Entity, InteractiveElement as _, IntoElement,
@@ -51,6 +53,8 @@ pub struct DesktopRoot {
     player_bar: Entity<PlayerBarView>,
     queue_state: Entity<QueuePanelState>,
     queue_panel: Entity<QueuePanel>,
+    room: Entity<RoomModel>,
+    room_panel: Entity<RoomPanel>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -84,8 +88,11 @@ impl DesktopRoot {
         let queue_state = cx.new(|_| QueuePanelState::default());
         let queue_panel = cx.new(|cx| QueuePanel::new(player.clone(), queue_state.clone(), cx));
         let player_bar = cx.new(|cx| PlayerBarView::new(player.clone(), queue_state.clone(), cx));
+        let room = cx.new(|_| RoomModel::default());
+        let room_panel = cx.new(|cx| RoomPanel::new(room.clone(), window, cx));
 
         let subscriptions = vec![
+            cx.observe(&room, |_, _, cx| cx.notify()),
             cx.observe(&playlists, {
                 let search = search.clone();
                 let artist = artist.clone();
@@ -155,6 +162,8 @@ impl DesktopRoot {
             player_bar,
             queue_state,
             queue_panel,
+            room,
+            room_panel,
             _subscriptions: subscriptions,
         }
     }
@@ -239,6 +248,10 @@ impl DesktopRoot {
         &self.search
     }
 
+    pub fn room(&self) -> &Entity<RoomModel> {
+        &self.room
+    }
+
     pub fn player(&self) -> &Entity<PlayerModel> {
         &self.player
     }
@@ -249,13 +262,19 @@ impl Render for DesktopRoot {
         let can_back = self.history.can_go_back();
         let can_forward = self.history.can_go_forward();
         let theme = cx.theme();
+        let room_open = self.room.read(cx).is_open();
         v_flex()
             .size_full()
+            .relative()
             .child(Header::new(
                 self.sidebar_collapsed,
                 cx.listener(|this, _, _, cx| {
                     this.sidebar_collapsed = !this.sidebar_collapsed;
                     cx.notify();
+                }),
+                room_open,
+                cx.listener(|this, _, _, cx| {
+                    this.room.update(cx, |model, cx| model.toggle_open(cx));
                 }),
             ))
             .child(
@@ -345,5 +364,14 @@ impl Render for DesktopRoot {
                     }),
             )
             .child(self.player_bar.clone())
+            .when(room_open, |this| {
+                this.child(
+                    div()
+                        .absolute()
+                        .top(px(44.))
+                        .right(px(16.))
+                        .child(self.room_panel.clone()),
+                )
+            })
     }
 }

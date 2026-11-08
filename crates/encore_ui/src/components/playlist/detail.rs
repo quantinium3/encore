@@ -494,6 +494,15 @@ fn build_track(
         Some(artist) => item.artist(artist),
         None => item,
     };
+    let item = match track.artist_id {
+        Some(artist_id) => item.on_artist_click(move |cx: &mut App| {
+            if let Some(navigator) = cx.try_global::<crate::artist::ArtistNavigator>() {
+                let model = navigator.0.clone();
+                model.update(cx, |model, cx| model.select(artist_id.clone(), cx));
+            }
+        }),
+        None => item,
+    };
     let item = match track.duration {
         Some(duration) => item.duration(duration),
         None => item,

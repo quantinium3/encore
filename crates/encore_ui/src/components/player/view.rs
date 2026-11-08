@@ -125,6 +125,14 @@ impl Render for PlayerBarView {
             if let Some(thumbnail) = &track.thumbnail_url {
                 bar = bar.thumbnail(thumbnail.clone());
             }
+            if let Some(artist_id) = track.artist_id.clone() {
+                bar = bar.on_artist(move |cx: &mut App| {
+                    if let Some(navigator) = cx.try_global::<crate::artist::ArtistNavigator>() {
+                        let model = navigator.0.clone();
+                        model.update(cx, |model, cx| model.select(artist_id.clone(), cx));
+                    }
+                });
+            }
         }
 
         bar.on_queue(toggle_queue(&self.queue_state))

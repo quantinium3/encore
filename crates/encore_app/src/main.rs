@@ -4,6 +4,7 @@ mod paths;
 mod playback;
 mod playlist_detail;
 mod playlists;
+mod presence;
 mod room;
 mod search;
 

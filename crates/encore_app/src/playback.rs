@@ -15,6 +15,7 @@ use gpui_kit::{App, Entity, SharedString, Window};
 use thiserror::Error;
 
 use crate::accounts::{DATABASE_FILE, run_blocking};
+use crate::presence::{Activity, Presence};
 use crate::room::{self, RoomSession};
 
 const MAX_RETRIES: u32 = 5;
@@ -46,6 +47,7 @@ pub(crate) struct Playback {
     pub(crate) priming: Arc<AtomicBool>,
     pub(crate) pending_seek: Arc<Mutex<Option<f64>>>,
     pub(crate) room: Arc<Mutex<RoomSession>>,
+    pub(crate) presence: Presence,
 }
 
 pub struct Wiring {
@@ -105,6 +107,7 @@ pub fn attach(
         priming: Arc::new(AtomicBool::new(false)),
         pending_seek: Arc::new(Mutex::new(None)),
         room: Arc::new(Mutex::new(RoomSession::default())),
+        presence: Presence::start(),
     };
 
     room::attach(&playback, room_model, window, cx);
@@ -522,6 +525,7 @@ fn listen_for_player_events(
                         playback
                             .model
                             .update(cx, |model, cx| model.set_duration_secs(duration, cx));
+                        update_presence(&playback, cx);
                         let seek = lock(&playback.pending_seek).take();
                         match seek {
                             Some(position) => {
@@ -534,6 +538,7 @@ fn listen_for_player_events(
                         playback
                             .model
                             .update(cx, |model, cx| model.set_playing(playing, cx));
+                        update_presence(&playback, cx);
                         room::enforce(&playback, cx);
                     }
                     encore_player::PlayerEvent::TrackEnded => {
@@ -547,6 +552,27 @@ fn listen_for_player_events(
             }
         })
         .detach();
+}
+
+fn update_presence(playback: &Playback, cx: &mut App) {
+    let model = playback.model.read(cx);
+    let Some(track) = model.current_track().filter(|_| model.status().is_playing()) else {
+        playback.presence.clear();
+        return;
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs() as i64);
+    let started_at = now - model.position_secs() as i64;
+    let duration = model.duration_secs();
+    playback.presence.set(Activity {
+        title: track.title.to_string(),
+        artist: track.artist.as_ref().map(SharedString::to_string),
+        album: track.album.as_ref().map(SharedString::to_string),
+        thumbnail_url: track.thumbnail_url.as_ref().map(SharedString::to_string),
+        started_at,
+        ends_at: (duration > 0.).then(|| started_at + duration as i64),
+    });
 }
 
 #[derive(Debug, Error)]

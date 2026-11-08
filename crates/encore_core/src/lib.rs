@@ -3,10 +3,13 @@ mod error;
 mod login;
 mod settings;
 
-pub use account::{Account, AccountId, AccountStore};
+pub use account::{
+    Account, AccountId, AccountProfile, AccountService, AccountStore, Accounts, EventOutcome,
+    SessionStatus, SignInError, apply_event, restore_session, sign_in, sign_out,
+};
 pub use error::StorageError;
 pub use login::{
     Login, LoginError, LoginProvider, ProfileStore, RefreshError, Session, SessionEvent,
-    SessionKeeper, SessionRefresher, SessionValidator, ValidationError, sapisid,
+    SessionKeeper, SessionRefresher, SessionValidator, ValidationError, VerifiedSession, sapisid,
 };
 pub use settings::{SettingKey, SettingsStore};

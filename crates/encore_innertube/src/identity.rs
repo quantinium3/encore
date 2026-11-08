@@ -212,9 +212,6 @@ pub(crate) fn find_all<'a>(root: &'a Value, key: &str) -> Vec<&'a Value> {
     found
 }
 
-/// Like [`find_all`], but never descends into a matched node. A row that embeds a nested
-/// copy of its own renderer (for example an editable playlist's suggestion command) would
-/// otherwise be counted twice.
 pub(crate) fn find_all_shallow<'a>(root: &'a Value, key: &str) -> Vec<&'a Value> {
     fn walk<'a>(node: &'a Value, key: &str, found: &mut Vec<&'a Value>) {
         match node {
@@ -253,9 +250,6 @@ pub(crate) fn text(node: Option<&Value>) -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
-/// The browse ID of the first artist linked from `node`'s runs, so an artist name in a track row
-/// can open that artist's page. Only channel-style IDs (`UC…`) count: the album and playlist links
-/// that sit in the same byline use other prefixes.
 pub(crate) fn artist_id(node: Option<&Value>) -> Option<String> {
     node?
         .get("runs")?

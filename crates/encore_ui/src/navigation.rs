@@ -1,9 +1,12 @@
 use gpui_kit::SharedString;
 
+use crate::search::SearchKind;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Location {
     Playlist(Option<SharedString>),
     Artist(SharedString),
+    Search { query: SharedString, kind: SearchKind },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

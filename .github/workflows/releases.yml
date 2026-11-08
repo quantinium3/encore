@@ -26,4 +26,4 @@ jobs:
             libsoup-3.0-dev
       - run: cargo build --release --workspace --bins
       - run: cargo test --workspace
-      - run: cargo package
+

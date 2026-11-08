@@ -36,7 +36,6 @@ pub struct PlayerBar {
     title: SharedString,
     artist: Option<SharedString>,
     thumbnail_url: Option<SharedString>,
-    indicator: bool,
     loading: bool,
     playing: bool,
     shuffle_active: bool,
@@ -63,7 +62,6 @@ impl PlayerBar {
             title: title.into(),
             artist: None,
             thumbnail_url: None,
-            indicator: false,
             loading: false,
             playing: false,
             shuffle_active: false,
@@ -91,11 +89,6 @@ impl PlayerBar {
 
     pub fn thumbnail(mut self, url: impl Into<SharedString>) -> Self {
         self.thumbnail_url = Some(url.into());
-        self
-    }
-
-    pub fn indicator(mut self, indicator: bool) -> Self {
-        self.indicator = indicator;
         self
     }
 
@@ -213,7 +206,6 @@ impl RenderOnce for PlayerBar {
             title,
             artist,
             thumbnail_url,
-            indicator,
             loading,
             playing,
             shuffle_active,
@@ -239,7 +231,6 @@ impl RenderOnce for PlayerBar {
         let foreground = theme.foreground;
         let muted = theme.muted_foreground;
         let track_bg = theme.muted;
-        let indicator_color = theme.success;
         let play_bg = theme.primary;
         let play_fg = theme.primary_foreground;
         let volume_low = theme.success;
@@ -274,30 +265,16 @@ impl RenderOnce for PlayerBar {
                     .flex_1()
                     .min_w_0()
                     .child(
-                        h_flex()
-                            .w_full()
-                            .min_w_0()
-                            .gap_1p5()
-                            .items_center()
-                            .child(
-                                div().min_w_0().flex_1().child(Marquee::new(
-                                    format!("{id}-title"),
-                                    div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .text_color(foreground)
-                                        .child(title),
-                                )),
-                            )
-                            .when(indicator, |this| {
-                                this.child(
-                                    div()
-                                        .size(px(6.))
-                                        .flex_shrink_0()
-                                        .rounded(px(99.))
-                                        .bg(indicator_color),
-                                )
-                            }),
+                        h_flex().w_full().min_w_0().gap_1p5().items_center().child(
+                            div().min_w_0().flex_1().child(Marquee::new(
+                                format!("{id}-title"),
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(foreground)
+                                    .child(title),
+                            )),
+                        ),
                     )
                     .when_some(artist, |this, artist| match on_artist {
                         Some(handler) => this.child(

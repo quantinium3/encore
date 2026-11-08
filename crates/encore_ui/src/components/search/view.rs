@@ -14,7 +14,6 @@ use gpui_kit::{
 };
 
 use crate::artist::{ArtistModel, CardSummary};
-use crate::components::card::Card;
 use crate::components::playlist::detail::render_unnumbered_track as render_track;
 use crate::player::PlayerModel;
 use crate::playlists::PlaylistsModel;
@@ -139,9 +138,13 @@ impl Render for SearchView {
             SearchState::Playlists(cards) => {
                 card_rows(cards, "Playlist", false, self.playlists.clone(), None)
             }
-            SearchState::Artists(cards) => {
-                card_rows(cards, "Artist", true, self.playlists.clone(), Some(self.artist.clone()))
-            }
+            SearchState::Artists(cards) => card_rows(
+                cards,
+                "Artist",
+                true,
+                self.playlists.clone(),
+                Some(self.artist.clone()),
+            ),
         };
 
         v_flex()
@@ -360,7 +363,13 @@ impl gpui_kit::RenderOnce for RowContent {
             .min_w_0()
             .items_center()
             .gap_x_3()
-            .child(artwork(self.thumbnail, 40., self.circular, muted, cx.theme().muted))
+            .child(artwork(
+                self.thumbnail,
+                40.,
+                self.circular,
+                muted,
+                cx.theme().muted,
+            ))
             .child(
                 v_flex()
                     .flex_1()
@@ -419,7 +428,13 @@ fn render_top_lead(
     top_lead(colors, card, kind, circular, select)
 }
 
-fn top_lead(colors: (Hsla, Hsla), card: CardSummary, kind: &'static str, circular: bool, select: Select) -> AnyElement {
+fn top_lead(
+    colors: (Hsla, Hsla),
+    card: CardSummary,
+    kind: &'static str,
+    circular: bool,
+    select: Select,
+) -> AnyElement {
     let id = card.id.clone();
     Button::new(format!("search-top-{}", card.id))
         .cursor_pointer()
@@ -433,7 +448,13 @@ fn top_lead(colors: (Hsla, Hsla), card: CardSummary, kind: &'static str, circula
                 .min_w_0()
                 .items_center()
                 .gap_x_4()
-                .child(artwork(card.thumbnail_url, 96., circular, colors.0, colors.1))
+                .child(artwork(
+                    card.thumbnail_url,
+                    96.,
+                    circular,
+                    colors.0,
+                    colors.1,
+                ))
                 .child(
                     v_flex()
                         .flex_1()
@@ -469,20 +490,4 @@ fn empty_message(muted: Hsla, kind: SearchKind) -> AnyElement {
             kind.label().to_lowercase()
         )))
         .into_any_element()
-}
-
-pub(crate) fn render_card(card: CardSummary, rounded_full: bool) -> Card {
-    let item = Card::new(format!("search-card-{}", card.id), card.title);
-    let item = match card.subtitle {
-        Some(subtitle) => item.subtitle(subtitle),
-        None => item,
-    };
-    let item = match card.thumbnail_url {
-        Some(url) => item.thumbnail(url),
-        None => item,
-    };
-    match rounded_full {
-        true => item.rounded_full(),
-        false => item,
-    }
 }

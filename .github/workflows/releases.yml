@@ -47,7 +47,7 @@ jobs:
           tar -C dist -czf encore-linux-x86_64.tar.gz .
 
       - name: github releases
-        uses: softprops/action-gh-releases@v3
+        uses: softprops/action-gh-release@v3
         if: github.ref_type == 'tag'
         with:
           file: encore-linux-x86_64.tar.gz

@@ -1,5 +1,6 @@
+use crate::components::account::switcher::AccountSwitcher;
 use gpui_kit::{
-    App, IntoElement, RenderOnce, Styled, Window,
+    App, Entity, IntoElement, RenderOnce, Styled, Window,
     assets::IconName,
     component::sidebar::{Sidebar, SidebarCollapsible, SidebarMenu, SidebarMenuItem},
     px,
@@ -8,11 +9,15 @@ use gpui_kit::{
 #[derive(IntoElement)]
 pub struct AppSidebar {
     collapsed: bool,
+    account_switcher: Entity<AccountSwitcher>,
 }
 
 impl AppSidebar {
-    pub fn new(collapsed: bool) -> Self {
-        Self { collapsed }
+    pub fn new(collapsed: bool, account_switcher: Entity<AccountSwitcher>) -> Self {
+        Self {
+            collapsed,
+            account_switcher,
+        }
     }
 }
 
@@ -22,6 +27,7 @@ impl RenderOnce for AppSidebar {
             .collapsible(SidebarCollapsible::Offcanvas)
             .collapsed(self.collapsed)
             .w(px(240.))
+            .header(self.account_switcher)
             .child(
                 SidebarMenu::new().child(
                     SidebarMenuItem::new("Home")

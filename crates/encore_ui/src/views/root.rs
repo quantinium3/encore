@@ -1,6 +1,8 @@
 use crate::accounts::AccountsModel;
 use crate::components::account::switcher::AccountSwitcher;
 use crate::components::layout::{header::Header, sidebar::AppSidebar};
+use crate::components::sidebar::panel::PlaylistsPanel;
+use crate::playlists::PlaylistsModel;
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
     Window,
@@ -11,21 +13,31 @@ pub struct DesktopRoot {
     sidebar_collapsed: bool,
     accounts: Entity<AccountsModel>,
     account_switcher: Entity<AccountSwitcher>,
+    playlists: Entity<PlaylistsModel>,
+    playlists_panel: Entity<PlaylistsPanel>,
 }
 
 impl DesktopRoot {
     pub fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
         let accounts = cx.new(|_| AccountsModel::default());
         let account_switcher = cx.new(|cx| AccountSwitcher::new(accounts.clone(), cx));
+        let playlists = cx.new(|_| PlaylistsModel::default());
+        let playlists_panel = cx.new(|cx| PlaylistsPanel::new(playlists.clone(), cx));
         Self {
             sidebar_collapsed: false,
             accounts,
             account_switcher,
+            playlists,
+            playlists_panel,
         }
     }
 
     pub fn accounts(&self) -> &Entity<AccountsModel> {
         &self.accounts
+    }
+
+    pub fn playlists(&self) -> &Entity<PlaylistsModel> {
+        &self.playlists
     }
 }
 
@@ -47,6 +59,7 @@ impl Render for DesktopRoot {
                     .child(AppSidebar::new(
                         self.sidebar_collapsed,
                         self.account_switcher.clone(),
+                        self.playlists_panel.clone(),
                     )),
             )
     }

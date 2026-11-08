@@ -1,16 +1,22 @@
 use std::sync::Mutex;
 
-use encore_core::{AccountId, Session, SessionValidator, ValidationError, VerifiedSession, sapisid};
+use encore_core::{
+    AccountId, Playlist, PlaylistDetail, PlaylistError, PlaylistProvider, Session,
+    SessionValidator, ValidationError, VerifiedSession, sapisid,
+};
 use serde_json::json;
 
 use crate::error::Error;
 use crate::identity::{
     AccountMenu, parse_account_menu, parse_selected_identity, parse_visitor_data,
 };
+use crate::playlist_detail::parse_playlist_detail;
+use crate::playlists::{LIBRARY_PLAYLISTS_BROWSE_ID, parse_library_playlists};
 use crate::transport::Transport;
 
 const ACCOUNT_MENU: &str = "account/account_menu";
 const ACCOUNTS_LIST: &str = "account/accounts_list";
+const BROWSE: &str = "browse";
 
 pub struct InnertubeValidator {
     transport: Transport,
@@ -71,6 +77,27 @@ impl InnertubeValidator {
             status => Err(format!("HTTP {status}")),
         }
     }
+
+    fn browse(
+        &self,
+        session: &Session,
+        browse_id: &str,
+    ) -> Result<crate::transport::Reply, PlaylistError> {
+        let sapisid = match sapisid(session.cookie()) {
+            Some(sapisid) => sapisid,
+            None => return Err(PlaylistError::Rejected),
+        };
+        let visitor = self.anonymous_visitor();
+        self.transport
+            .post(
+                BROWSE,
+                session.cookie(),
+                sapisid,
+                visitor.as_deref(),
+                json!({ "browseId": browse_id }),
+            )
+            .map_err(playlist_backend)
+    }
 }
 
 impl Default for InnertubeValidator {
@@ -130,6 +157,32 @@ impl SessionValidator for InnertubeValidator {
     }
 }
 
+impl PlaylistProvider for InnertubeValidator {
+    fn playlists(&self, session: &Session) -> Result<Vec<Playlist>, PlaylistError> {
+        let reply = self.browse(session, LIBRARY_PLAYLISTS_BROWSE_ID)?;
+        match reply.status {
+            200..=299 => parse_library_playlists(&reply.body)
+                .map_err(|error| playlist_backend(Error::Response(error))),
+            401 | 403 => Err(PlaylistError::Rejected),
+            status => Err(playlist_backend(Error::Status(status))),
+        }
+    }
+
+    fn playlist(
+        &self,
+        session: &Session,
+        playlist_id: &str,
+    ) -> Result<PlaylistDetail, PlaylistError> {
+        let reply = self.browse(session, playlist_id)?;
+        match reply.status {
+            200..=299 => parse_playlist_detail(&reply.body)
+                .map_err(|error| playlist_backend(Error::Response(error))),
+            401 | 403 => Err(PlaylistError::Rejected),
+            status => Err(playlist_backend(Error::Status(status))),
+        }
+    }
+}
+
 fn no_identity(menu: &AccountMenu, accounts_list: &str) -> ValidationError {
     backend(Error::NoIdentity(format!(
         "{}; accounts_list: {accounts_list}",
@@ -139,6 +192,10 @@ fn no_identity(menu: &AccountMenu, accounts_list: &str) -> ValidationError {
 
 fn backend(error: Error) -> ValidationError {
     ValidationError::Backend(Box::new(error))
+}
+
+fn playlist_backend(error: Error) -> PlaylistError {
+    PlaylistError::Backend(Box::new(error))
 }
 
 #[cfg(test)]

@@ -40,12 +40,16 @@ jobs:
       - name: build workspace
         run: cargo build --release --workspace --bins --locked
 
+      - name: build rustypipe-botguard
+        run: cargo install rustypipe-botguard --locked --root rustypipe-botguard-install
+
       - name: packaging
         run: |
           mkdir -p dist
           strip target/release/encore_app target/release/encore_login
           mv target/release/encore_app dist/
           mv target/release/encore_login dist/
+          cp rustypipe-botguard-install/bin/rustypipe-botguard dist/
           tar -C dist -czf encore-linux-x86_64.tar.gz .
           sha256sum encore-linux-x86_64.tar.gz > encore-linux-x86_64.tar.gz.sha256
 

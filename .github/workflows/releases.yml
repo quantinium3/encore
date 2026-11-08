@@ -1,30 +1,55 @@
-name: Encore
+name: encore-release
 on:
   push:
-    tags:
-      - "v*"
+
+permissions:
+  contents: write
+
 jobs:
-  Explore-Github-Actions:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/cache@v4
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: caching dependencies
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: |
+
+      - name: installing dependencies
+        run: |
           sudo apt-get update
-          sudo apt-get install -y
-          sudo apt install libxkbcommon-x11-dev \
+          sudo apt-get install -y libxkbcommon-x11-dev \
             libmpv-dev \
             pkg-config \
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev \
             libjavascriptcoregtk-4.1-dev \
             libsoup-3.0-dev
-      - run: cargo build --release --workspace --bins
-      - run: cargo test --workspace
+
+      - name: testing workspace
+        run: cargo test --workspace
+
+      - name: build workspace
+        run: cargo build --release --workspace --bins
+
+      - name: packaging
+        run: |
+          mkdir -p dist
+          strip target/release/encore_app target/release/encore_login
+          mv target/release/encore_app dist/
+          mv target/release/encore_login dist/
+          tar -C dist -czf encore-linux-x86_64.tar.gz .
+
+      - name: github releases
+        uses: softprops/action-gh-releases@v3
+        if: github.ref_type == 'tag'
+        with:
+          file: encore-linux-x86_64.tar.gz
+
 

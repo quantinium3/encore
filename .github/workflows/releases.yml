@@ -1,11 +1,17 @@
 name: encore-release
+
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -15,13 +21,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: caching dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        uses: Swatinem/rust-cache@v2
 
       - name: installing dependencies
         run: |
@@ -35,10 +35,10 @@ jobs:
             libsoup-3.0-dev
 
       - name: testing workspace
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
 
       - name: build workspace
-        run: cargo build --release --workspace --bins
+        run: cargo build --release --workspace --bins --locked
 
       - name: packaging
         run: |
@@ -47,11 +47,15 @@ jobs:
           mv target/release/encore_app dist/
           mv target/release/encore_login dist/
           tar -C dist -czf encore-linux-x86_64.tar.gz .
+          sha256sum encore-linux-x86_64.tar.gz > encore-linux-x86_64.tar.gz.sha256
 
       - name: github releases
         uses: softprops/action-gh-release@v3
         if: github.ref_type == 'tag'
         with:
-          file: encore-linux-x86_64.tar.gz
+          files: |
+            encore-linux-x86_64.tar.gz
+            encore-linux-x86_64.tar.gz.sha256
+          generate_release_notes: true
 
 

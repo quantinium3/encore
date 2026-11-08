@@ -1,4 +1,6 @@
 pub mod account;
+pub mod artist;
+pub mod card;
 pub mod layout;
 pub mod marquee;
 pub mod player;

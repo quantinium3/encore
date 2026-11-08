@@ -14,6 +14,7 @@ encore_auth.workspace = true
 encore_storage.workspace = true
 encore_innertube.workspace = true
 encore_player.workspace = true
+encore_room.workspace = true
 encore_stream.workspace = true
 futures.workspace = true
 dirs = "7.0.0"

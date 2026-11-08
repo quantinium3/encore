@@ -6,6 +6,7 @@ members = [
 	"crates/encore_core", "crates/encore_storage",
 	"crates/encore_innertube",
 	"crates/encore_player",
+	"crates/encore_room",
 	"crates/encore_stream",
 	"crates/encore_ui",
 ]
@@ -29,6 +30,7 @@ encore_ui = { path = "crates/encore_ui" }
 encore_auth = { path = "crates/encore_auth" }
 encore_innertube = { path = "crates/encore_innertube" }
 encore_player = { path = "crates/encore_player" }
+encore_room = { path = "crates/encore_room" }
 encore_stream = { path = "crates/encore_stream" }
 encore_storage = { path = "crates/encore_storage" }
 

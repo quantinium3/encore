@@ -15,6 +15,7 @@ use gpui_kit::{App, Entity, SharedString, Window};
 use thiserror::Error;
 
 use crate::accounts::{DATABASE_FILE, run_blocking};
+use crate::room::{self, RoomSession};
 
 const MAX_RETRIES: u32 = 5;
 
@@ -43,6 +44,8 @@ pub(crate) struct Playback {
     pub(crate) lookahead: Arc<Mutex<Option<Lookahead>>>,
     pub(crate) generation: Arc<AtomicU64>,
     pub(crate) priming: Arc<AtomicBool>,
+    pub(crate) pending_seek: Arc<Mutex<Option<f64>>>,
+    pub(crate) room: Arc<Mutex<RoomSession>>,
 }
 
 pub struct Wiring {
@@ -73,7 +76,13 @@ pub fn build(data_dir: &Path) -> anyhow::Result<Wiring> {
     })
 }
 
-pub fn attach(wiring: Wiring, model: &Entity<PlayerModel>, window: &mut Window, cx: &mut App) {
+pub fn attach(
+    wiring: Wiring,
+    model: &Entity<PlayerModel>,
+    room_model: &Entity<encore_ui::RoomModel>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let Wiring {
         player,
         resolver,
@@ -94,7 +103,11 @@ pub fn attach(wiring: Wiring, model: &Entity<PlayerModel>, window: &mut Window, 
         lookahead: Arc::new(Mutex::new(None)),
         generation: Arc::new(AtomicU64::new(0)),
         priming: Arc::new(AtomicBool::new(false)),
+        pending_seek: Arc::new(Mutex::new(None)),
+        room: Arc::new(Mutex::new(RoomSession::default())),
     };
+
+    room::attach(&playback, room_model, window, cx);
 
     report(
         playback.player.set_volume(model.read(cx).volume_percent()),
@@ -114,6 +127,9 @@ pub fn attach(wiring: Wiring, model: &Entity<PlayerModel>, window: &mut Window, 
 }
 
 fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window, cx: &mut App) {
+    if room::route(playback, event, cx) {
+        return;
+    }
     match event {
         PlayerEvent::PlayQueueRequested {
             tracks,
@@ -179,6 +195,7 @@ fn handle_request(playback: &Playback, event: &PlayerEvent, window: &mut Window,
 pub(crate) fn play_current(playback: &Playback, window: &mut Window, cx: &mut App) {
     playback.generation.fetch_add(1, Ordering::SeqCst);
     *lock(&playback.lookahead) = None;
+    *lock(&playback.pending_seek) = None;
 
     let video_id = lock(&playback.queue)
         .current_track()
@@ -231,6 +248,9 @@ fn reset_lookahead(playback: &Playback, window: &mut Window, cx: &mut App) {
 }
 
 fn prime_lookahead(playback: &Playback, window: &mut Window, cx: &mut App) {
+    if room::active(playback) {
+        return;
+    }
     let (index, video_id) = {
         let playing = lock(&playback.queue);
         match playing.peek_next() {
@@ -309,8 +329,13 @@ fn load(
 }
 
 fn skip_failed(playback: &Playback, window: &mut Window, cx: &mut App) {
-    lock(&playback.queue).advance();
-    play_current(playback, window, cx);
+    match room::active(playback) {
+        true => room::skip_current(playback),
+        false => {
+            lock(&playback.queue).advance();
+            play_current(playback, window, cx);
+        }
+    }
 }
 
 fn on_track_failed(playback: &Playback, error: &str, window: &mut Window, cx: &mut App) {
@@ -359,6 +384,10 @@ fn on_track_failed(playback: &Playback, error: &str, window: &mut Window, cx: &m
 }
 
 fn on_track_ended(playback: &Playback, window: &mut Window, cx: &mut App) {
+    if room::active(playback) {
+        room::track_ended(playback, cx);
+        return;
+    }
     let primed = lock(&playback.lookahead).take();
     let next = lock(&playback.queue).peek_next();
     match primed {
@@ -404,6 +433,9 @@ fn top_up_radio(playback: &Playback, window: &mut Window, cx: &mut App) {
             })
             .await;
             match result {
+                Some(Ok(tracks)) if room::active(&playback) => {
+                    room::append_radio(&playback, tracks);
+                }
                 Some(Ok(tracks)) => {
                     let added = lock(&queue).append(tracks);
                     let summaries: Vec<TrackSummary> = added.iter().map(to_ui_track).collect();
@@ -484,16 +516,25 @@ fn listen_for_player_events(
                         playback
                             .model
                             .update(cx, |model, cx| model.set_position_secs(position, cx));
+                        room::resync(&playback, cx, false);
                     }
                     encore_player::PlayerEvent::Duration(duration) => {
                         playback
                             .model
                             .update(cx, |model, cx| model.set_duration_secs(duration, cx));
+                        let seek = lock(&playback.pending_seek).take();
+                        match seek {
+                            Some(position) => {
+                                report(playback.player.seek(position), "resume the track")
+                            }
+                            None => room::resync(&playback, cx, true),
+                        }
                     }
                     encore_player::PlayerEvent::Playing(playing) => {
                         playback
                             .model
                             .update(cx, |model, cx| model.set_playing(playing, cx));
+                        room::enforce(&playback, cx);
                     }
                     encore_player::PlayerEvent::TrackEnded => {
                         on_track_ended(&playback, window, cx);

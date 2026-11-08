@@ -1876,6 +1876,7 @@ dependencies = [
  "encore_core",
  "encore_innertube",
  "encore_player",
+ "encore_room",
  "encore_storage",
  "encore_stream",
  "encore_ui",
@@ -1925,6 +1926,17 @@ dependencies = [
  "libmpv2",
  "libmpv2-sys",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "encore_room"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "ureq",
 ]
 
 [[package]]

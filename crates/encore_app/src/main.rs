@@ -4,6 +4,7 @@ mod paths;
 mod playback;
 mod playlist_detail;
 mod playlists;
+mod room;
 mod search;
 
 use std::sync::Arc;
@@ -57,6 +58,7 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
         let player_model = root.read(cx).player().clone();
         let artist_model = root.read(cx).artist().clone();
         let search_model = root.read(cx).search().clone();
+        let room_model = root.read(cx).room().clone();
         accounts::attach(accounts_wiring, &accounts_model, window, cx);
         playlists::attach(
             playlists_wiring,
@@ -72,9 +74,9 @@ fn start(cx: &mut App) -> anyhow::Result<()> {
             window,
             cx,
         );
-        playback::attach(playback_wiring, &player_model, window, cx);
         artist::attach(artist_wiring, &artist_model, window, cx);
         search::attach(search_wiring, &search_model, window, cx);
+        playback::attach(playback_wiring, &player_model, &room_model, window, cx);
         root
     })
     .context("failed to open window")?;

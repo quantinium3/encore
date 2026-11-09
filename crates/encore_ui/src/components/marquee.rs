@@ -1,11 +1,10 @@
 use std::time::{Duration, Instant};
 
 use gpui_kit::{
-    AnyElement, App, AvailableSpace, Bounds, ContentMask, Element, ElementId, Entity, GlobalElementId,
-    InspectorElementId, InteractiveElement as _, IntoElement, LayoutId, ParentElement as _, Pixels,
-    Point, RenderOnce, Size, StatefulInteractiveElement as _, Style, Styled as _, Window, div, px,
-    prelude::FluentBuilder as _,
-    relative, size,
+    AnyElement, App, AvailableSpace, Bounds, ContentMask, Element, ElementId, Entity,
+    GlobalElementId, InspectorElementId, InteractiveElement as _, IntoElement, LayoutId,
+    ParentElement as _, Pixels, Point, RenderOnce, Size, StatefulInteractiveElement as _, Style,
+    Styled as _, Window, div, prelude::FluentBuilder as _, px, relative, size,
 };
 
 const SCROLL_SPEED: f32 = 36.;
@@ -100,7 +99,7 @@ impl IntoElement for MarqueeTrack {
 }
 
 impl Element for MarqueeTrack {
-    type RequestLayoutState = ();
+    type RequestLayoutState = Size<Pixels>;
     type PrepaintState = Pixels;
 
     fn id(&self) -> Option<ElementId> {
@@ -118,21 +117,25 @@ impl Element for MarqueeTrack {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
-        let cached_height = window.with_element_state(
-            global_id.expect("MarqueeTrack must have an id"),
-            |state: Option<MarqueeTrackState>, _| {
-                let state = state.unwrap_or_default();
-                (state.content_size.map(|size| size.height), state)
-            },
+        let measured = self.child.layout_as_root(
+            size(AvailableSpace::MaxContent, AvailableSpace::MaxContent),
+            window,
+            cx,
         );
+
+        let global_id = global_id.expect("MarqueeTrack must have an id");
+        let cached_height =
+            window.with_element_state(global_id, |state: Option<MarqueeTrackState>, _| {
+                let mut state = state.unwrap_or_default();
+                state.content_size = Some(measured);
+                (measured.height, state)
+            });
 
         let mut style = Style::default();
         style.size.width = relative(1.0).into();
-        if let Some(height) = cached_height {
-            style.size.height = height.into();
-        }
+        style.size.height = cached_height.into();
 
-        (window.request_layout(style, None, cx), ())
+        (window.request_layout(style, None, cx), measured)
     }
 
     fn prepaint(

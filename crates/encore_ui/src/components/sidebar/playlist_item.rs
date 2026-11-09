@@ -1,6 +1,6 @@
 use gpui_kit::{
-    App, ClickEvent, ElementId, FontWeight, IntoElement, ObjectFit, ParentElement as _,
-    RenderOnce, SharedString, Styled as _, StyledImage as _, Window,
+    App, ClickEvent, ElementId, FontWeight, IntoElement, ObjectFit, ParentElement as _, RenderOnce,
+    SharedString, Styled as _, StyledImage as _, Window,
     assets::IconName,
     base::{h_flex, v_flex},
     component::{
@@ -19,6 +19,7 @@ const THUMBNAIL_SIZE: f32 = 36.;
 #[derive(IntoElement)]
 pub struct SidebarPlaylistItem {
     id: ElementId,
+    marquee_id: SharedString,
     title: SharedString,
     subtitle: Option<SharedString>,
     thumbnail_url: Option<SharedString>,
@@ -28,8 +29,11 @@ pub struct SidebarPlaylistItem {
 
 impl SidebarPlaylistItem {
     pub fn new(id: impl Into<ElementId>, title: impl Into<SharedString>) -> Self {
+        let id = id.into();
+        let marquee_id = format!("{:?}-title", id).into();
         Self {
             id: id.into(),
+            marquee_id: marquee_id,
             title: title.into(),
             subtitle: None,
             thumbnail_url: None,
@@ -96,7 +100,7 @@ impl RenderOnce for SidebarPlaylistItem {
                     .text_sm()
                     .font_weight(FontWeight::MEDIUM)
                     .text_color(foreground)
-                    .child(Marquee::new(format!("{}-title", self.id), self.title)),
+                    .child(Marquee::new(self.marquee_id, self.title)),
             )
             .when_some(self.subtitle, |this, subtitle| {
                 this.child(
@@ -119,7 +123,6 @@ impl RenderOnce for SidebarPlaylistItem {
             .child(text);
 
         let button = Button::new(self.id)
-
             .cursor_pointer()
             .ghost()
             .selected(self.active)

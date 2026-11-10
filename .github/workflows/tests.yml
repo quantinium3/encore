@@ -1,0 +1,42 @@
+name: encore-test
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: caching dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: installing dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-x11-dev \
+            libmpv-dev \
+            pkg-config \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev
+
+      - name: testing workspace
+        run: cargo test --workspace --locked
+
+      - name: build workspace
+        run: cargo build --release --workspace --bins --locked
+
+      - name: build rustypipe-botguard
+        run: cargo install rustypipe-botguard --locked --root rustypipe-botguard-install
+

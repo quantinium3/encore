@@ -36,7 +36,3 @@ jobs:
 
       - name: build workspace
         run: cargo build --release --workspace --bins --locked
-
-      - name: build rustypipe-botguard
-        run: cargo install rustypipe-botguard --locked --root rustypipe-botguard-install
-

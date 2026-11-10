@@ -53,6 +53,11 @@ jobs:
           tar -C dist -czf encore-linux-x86_64.tar.gz .
           sha256sum encore-linux-x86_64.tar.gz > encore-linux-x86_64.tar.gz.sha256
 
+      - name: deploy cloudflare worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+
+
       - name: github releases
         uses: softprops/action-gh-release@v3
         if: github.ref_type == 'tag'

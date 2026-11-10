@@ -61,5 +61,3 @@ jobs:
             encore-linux-x86_64.tar.gz
             encore-linux-x86_64.tar.gz.sha256
           generate_release_notes: true
-
-
